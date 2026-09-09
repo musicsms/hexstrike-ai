@@ -180,3 +180,21 @@ def test_clair_scan_handler_invocation(monkeypatch):
     res = tool.handler(image="myimage:latest", config="/tmp/clair.yaml", output_format="json", additional_args="-v")
     assert res["success"] is True
     assert captured["cmd"] == ["clairctl", "analyze", "myimage:latest", "--config", "/tmp/clair.yaml", "--format", "json", "-v"]
+
+
+def test_checkov_scan_handler_invocation(monkeypatch):
+    captured = _mock_execute(monkeypatch)
+    tool = ToolRegistry.get("checkov_scan")
+    assert tool is not None
+    assert tool.endpoint == "/api/tools/checkov"
+
+    res = tool.handler(
+        directory="/tmp/iac", framework="terraform", check="CKV_AWS_1",
+        skip_check="CKV_AWS_2", output_format="json", additional_args="--compact",
+    )
+    assert res["success"] is True
+    assert captured["cmd"] == [
+        "checkov", "-d", "/tmp/iac",
+        "--framework", "terraform", "--check", "CKV_AWS_1", "--skip-check", "CKV_AWS_2",
+        "--output", "json", "--compact",
+    ]

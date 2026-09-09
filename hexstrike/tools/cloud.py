@@ -184,3 +184,23 @@ def clair_scan(image: str, config: str = "/etc/clair/config.yaml", output_format
     if additional_args:
         cmd.extend(additional_args.split())
     return run_tool_command(cmd)
+
+@ToolRegistry.register(
+    name="checkov_scan",
+    category="cloud",
+    description="Infrastructure as code security scanning using Checkov",
+    endpoint="/api/tools/checkov"
+)
+def checkov_scan(directory: str = ".", framework: Optional[str] = None, check: Optional[str] = None, skip_check: Optional[str] = None, output_format: str = "json", additional_args: Optional[str] = None) -> Dict[str, Any]:
+    cmd = ["checkov", "-d", directory]
+    if framework:
+        cmd.extend(["--framework", framework])
+    if check:
+        cmd.extend(["--check", check])
+    if skip_check:
+        cmd.extend(["--skip-check", skip_check])
+    if output_format:
+        cmd.extend(["--output", output_format])
+    if additional_args:
+        cmd.extend(additional_args.split())
+    return run_tool_command(cmd)
