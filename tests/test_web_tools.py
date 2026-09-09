@@ -235,3 +235,14 @@ def test_wfuzz_scan_handler_invocation(monkeypatch):
     res = tool.handler(url="http://x.com/FUZZ", wordlist="/tmp/wl.txt", additional_args="-c")
     assert res["success"] is True
     assert captured["cmd"] == ["wfuzz", "-w", "/tmp/wl.txt", "http://x.com/FUZZ", "-c"]
+
+
+def test_wpscan_scan_handler_invocation(monkeypatch):
+    captured = _mock_execute(monkeypatch)
+    tool = ToolRegistry.get("wpscan_scan")
+    assert tool is not None
+    assert tool.endpoint == "/api/tools/wpscan"
+
+    res = tool.handler(url="http://x.com", additional_args="--enumerate p")
+    assert res["success"] is True
+    assert captured["cmd"] == ["wpscan", "--url", "http://x.com", "--enumerate", "p"]

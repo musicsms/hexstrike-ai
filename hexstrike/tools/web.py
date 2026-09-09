@@ -293,3 +293,15 @@ def wfuzz_scan(url: str, wordlist: str = "/usr/share/wordlists/dirb/common.txt",
     if additional_args:
         cmd.extend(additional_args.split())
     return run_tool_command(cmd)
+
+@ToolRegistry.register(
+    name="wpscan_scan",
+    category="web",
+    description="WordPress vulnerability scanning using WPScan",
+    endpoint="/api/tools/wpscan"
+)
+def wpscan_scan(url: str, additional_args: Optional[str] = None) -> Dict[str, Any]:
+    cmd = ["wpscan", "--url", url]
+    if additional_args:
+        cmd.extend(additional_args.split())
+    return run_tool_command(cmd)
