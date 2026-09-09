@@ -202,3 +202,14 @@ def test_paramspider_mine_handler_invocation(monkeypatch):
     res = tool.handler(domain="example.com", level=3, exclude="png,jpg", output="/tmp/out.txt", additional_args="-q")
     assert res["success"] is True
     assert captured["cmd"] == ["paramspider", "-d", "example.com", "-l", "3", "--exclude", "png,jpg", "-o", "/tmp/out.txt", "-q"]
+
+
+def test_wafw00f_scan_handler_invocation(monkeypatch):
+    captured = _mock_execute(monkeypatch)
+    tool = ToolRegistry.get("wafw00f_scan")
+    assert tool is not None
+    assert tool.endpoint == "/api/tools/wafw00f"
+
+    res = tool.handler(target="http://x.com", additional_args="-a")
+    assert res["success"] is True
+    assert captured["cmd"] == ["wafw00f", "http://x.com", "-a"]

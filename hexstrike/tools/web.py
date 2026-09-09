@@ -253,3 +253,15 @@ def paramspider_mine(domain: str, level: int = 2, exclude: str = "png,jpg,gif,jp
     if additional_args:
         cmd.extend(additional_args.split())
     return run_tool_command(cmd)
+
+@ToolRegistry.register(
+    name="wafw00f_scan",
+    category="web",
+    description="WAF fingerprinting using wafw00f",
+    endpoint="/api/tools/wafw00f"
+)
+def wafw00f_scan(target: str, additional_args: Optional[str] = None) -> Dict[str, Any]:
+    cmd = ["wafw00f", target]
+    if additional_args:
+        cmd.extend(additional_args.split())
+    return run_tool_command(cmd)
