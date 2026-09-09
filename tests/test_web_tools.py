@@ -158,3 +158,14 @@ def test_jaeles_scan_handler_invocation(monkeypatch):
         "jaeles", "scan", "-u", "http://x.com", "-c", "5", "--timeout", "10",
         "-s", "/tmp/sigs", "--config", "/tmp/cfg", "-v",
     ]
+
+
+def test_katana_crawl_handler_invocation(monkeypatch):
+    captured = _mock_execute(monkeypatch)
+    tool = ToolRegistry.get("katana_crawl")
+    assert tool is not None
+    assert tool.endpoint == "/api/tools/katana"
+
+    res = tool.handler(url="http://x.com", depth=5, js_crawl=True, form_extraction=True, output_format="json", additional_args="-silent")
+    assert res["success"] is True
+    assert captured["cmd"] == ["katana", "-u", "http://x.com", "-d", "5", "-jc", "-fx", "-jsonl", "-silent"]

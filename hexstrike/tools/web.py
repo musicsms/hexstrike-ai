@@ -189,3 +189,21 @@ def jaeles_scan(url: str, signatures: Optional[str] = None, config: Optional[str
     if additional_args:
         cmd.extend(additional_args.split())
     return run_tool_command(cmd)
+
+@ToolRegistry.register(
+    name="katana_crawl",
+    category="web",
+    description="Next-generation web crawling and spidering using Katana",
+    endpoint="/api/tools/katana"
+)
+def katana_crawl(url: str, depth: int = 3, js_crawl: bool = True, form_extraction: bool = True, output_format: str = "json", additional_args: Optional[str] = None) -> Dict[str, Any]:
+    cmd = ["katana", "-u", url, "-d", str(depth)]
+    if js_crawl:
+        cmd.append("-jc")
+    if form_extraction:
+        cmd.append("-fx")
+    if output_format == "json":
+        cmd.append("-jsonl")
+    if additional_args:
+        cmd.extend(additional_args.split())
+    return run_tool_command(cmd)
