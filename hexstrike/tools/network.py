@@ -192,3 +192,23 @@ def netexec_scan(target: str, protocol: str = "smb", username: Optional[str] = N
     if additional_args:
         cmd.extend(additional_args.split())
     return run_tool_command(cmd)
+
+@ToolRegistry.register(
+    name="responder_capture",
+    category="network",
+    description="LLMNR/NBT-NS/mDNS poisoner and credential harvester using Responder",
+    endpoint="/api/tools/responder"
+)
+def responder_capture(interface: str = "eth0", analyze: bool = False, wpad: bool = True, force_wpad_auth: bool = False, fingerprint: bool = False, duration: int = 300, additional_args: Optional[str] = None) -> Dict[str, Any]:
+    cmd = ["timeout", str(duration), "responder", "-I", interface]
+    if analyze:
+        cmd.append("-A")
+    if wpad:
+        cmd.append("-w")
+    if force_wpad_auth:
+        cmd.append("-F")
+    if fingerprint:
+        cmd.append("-f")
+    if additional_args:
+        cmd.extend(additional_args.split())
+    return run_tool_command(cmd)

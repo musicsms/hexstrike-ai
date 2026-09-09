@@ -167,3 +167,17 @@ def test_netexec_scan_handler_invocation(monkeypatch):
         "-u", "admin", "-p", "pass", "-H", "aad3b435b51404eeaad3b435b51404ee", "-M", "mimikatz",
         "--local-auth",
     ]
+
+
+def test_responder_capture_handler_invocation(monkeypatch):
+    captured = _mock_execute(monkeypatch)
+    tool = ToolRegistry.get("responder_capture")
+    assert tool is not None
+    assert tool.endpoint == "/api/tools/responder"
+
+    res = tool.handler(
+        interface="eth0", analyze=True, wpad=True, force_wpad_auth=True,
+        fingerprint=True, duration=60, additional_args="--verbose",
+    )
+    assert res["success"] is True
+    assert captured["cmd"] == ["timeout", "60", "responder", "-I", "eth0", "-A", "-w", "-F", "-f", "--verbose"]
