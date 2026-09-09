@@ -268,3 +268,27 @@ def test_xsser_scan_handler_invocation(monkeypatch):
     res = tool.handler(url="http://x.com", params="id=1", additional_args="--Fp")
     assert res["success"] is True
     assert captured["cmd"] == ["xsser", "--url", "http://x.com", "--param=id=1", "--Fp"]
+
+
+def test_zap_scan_handler_invocation_quickscan(monkeypatch):
+    captured = _mock_execute(monkeypatch)
+    tool = ToolRegistry.get("zap_scan")
+    assert tool is not None
+    assert tool.endpoint == "/api/tools/zap"
+
+    res = tool.handler(target="http://x.com", format="xml", output_file="/tmp/out", api_key="KEY123", additional_args="-cmd")
+    assert res["success"] is True
+    assert captured["cmd"] == [
+        "zaproxy", "-cmd", "-quickurl", "http://x.com",
+        "-quickout", "xml", "-quickprogress", "-dir", "/tmp/out",
+        "-config", "api.key=KEY123", "-cmd",
+    ]
+
+
+def test_zap_scan_handler_invocation_daemon(monkeypatch):
+    captured = _mock_execute(monkeypatch)
+    tool = ToolRegistry.get("zap_scan")
+
+    res = tool.handler(daemon=True, host="127.0.0.1", port="9090", api_key="KEY123")
+    assert res["success"] is True
+    assert captured["cmd"] == ["zaproxy", "-daemon", "-host", "127.0.0.1", "-port", "9090", "-config", "api.key=KEY123"]

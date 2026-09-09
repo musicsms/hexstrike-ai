@@ -335,3 +335,26 @@ def xsser_scan(url: str, params: Optional[str] = None, additional_args: Optional
     if additional_args:
         cmd.extend(additional_args.split())
     return run_tool_command(cmd)
+
+@ToolRegistry.register(
+    name="zap_scan",
+    category="web",
+    description="Web application scanning using OWASP ZAP",
+    endpoint="/api/tools/zap"
+)
+def zap_scan(target: Optional[str] = None, scan_type: str = "baseline", api_key: Optional[str] = None, daemon: bool = False, port: str = "8090", host: str = "0.0.0.0", format: str = "xml", output_file: Optional[str] = None, additional_args: Optional[str] = None) -> Dict[str, Any]:
+    if daemon:
+        cmd = ["zaproxy", "-daemon", "-host", host, "-port", port]
+        if api_key:
+            cmd.extend(["-config", f"api.key={api_key}"])
+    else:
+        cmd = ["zaproxy", "-cmd", "-quickurl", target]
+        if format:
+            cmd.extend(["-quickout", format])
+        if output_file:
+            cmd.extend(["-quickprogress", "-dir", output_file])
+        if api_key:
+            cmd.extend(["-config", f"api.key={api_key}"])
+    if additional_args:
+        cmd.extend(additional_args.split())
+    return run_tool_command(cmd)
