@@ -1,0 +1,19 @@
+import shutil
+from typing import Dict, Any, List
+from hexstrike.core.process import default_process_manager
+
+def is_tool_available(tool_name: str) -> bool:
+    return shutil.which(tool_name) is not None
+
+def run_tool_command(command: List[str], timeout: int = 300, use_cache: bool = True) -> Dict[str, Any]:
+    tool_binary = command[0]
+    if not is_tool_available(tool_binary):
+        return {
+            "success": False,
+            "command": " ".join(command),
+            "output": "",
+            "error": f"Tool binary '{tool_binary}' not found on system PATH",
+            "execution_time": "0.00s",
+            "cached": False
+        }
+    return default_process_manager.execute_command(command, timeout=timeout, use_cache=use_cache)
