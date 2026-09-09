@@ -150,3 +150,21 @@ def docker_bench_security_scan(checks: Optional[str] = None, exclude: Optional[s
     result = run_tool_command(cmd)
     result["output_file"] = output_file
     return result
+
+@ToolRegistry.register(
+    name="falco_scan",
+    category="cloud",
+    description="Runtime security monitoring using Falco",
+    endpoint="/api/tools/falco"
+)
+def falco_scan(config_file: str = "/etc/falco/falco.yaml", rules_file: Optional[str] = None, output_format: str = "json", duration: int = 60, additional_args: Optional[str] = None) -> Dict[str, Any]:
+    cmd = ["timeout", str(duration), "falco"]
+    if config_file:
+        cmd.extend(["--config", config_file])
+    if rules_file:
+        cmd.extend(["--rules", rules_file])
+    if output_format == "json":
+        cmd.append("--json")
+    if additional_args:
+        cmd.extend(additional_args.split())
+    return run_tool_command(cmd)

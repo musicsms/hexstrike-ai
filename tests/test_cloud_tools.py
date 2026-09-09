@@ -158,3 +158,14 @@ def test_docker_bench_security_scan_handler_invocation(monkeypatch):
 
     res2 = tool.handler()
     assert res2["output_file"] == "/tmp/docker-bench-results.json"
+
+
+def test_falco_scan_handler_invocation(monkeypatch):
+    captured = _mock_execute(monkeypatch)
+    tool = ToolRegistry.get("falco_scan")
+    assert tool is not None
+    assert tool.endpoint == "/api/tools/falco"
+
+    res = tool.handler(config_file="/tmp/falco.yaml", rules_file="/tmp/rules.yaml", output_format="json", duration=30, additional_args="-v")
+    assert res["success"] is True
+    assert captured["cmd"] == ["timeout", "30", "falco", "--config", "/tmp/falco.yaml", "--rules", "/tmp/rules.yaml", "--json", "-v"]
