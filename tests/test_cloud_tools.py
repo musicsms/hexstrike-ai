@@ -1,4 +1,3 @@
-import pytest
 from pathlib import Path
 from hexstrike.core.registry import ToolRegistry
 from hexstrike.core.process import default_process_manager
@@ -64,6 +63,7 @@ def test_trivy_scan_handler_invocation(monkeypatch):
 
     res2 = tool.handler(target="myimage:latest")
     assert "output_file" not in res2
+    assert captured["cmd"] == ["trivy", "image", "myimage:latest", "--format", "json"]
 
 
 def test_scout_suite_scan_handler_invocation_aws(monkeypatch, tmp_path):
@@ -98,6 +98,8 @@ def test_scout_suite_scan_handler_invocation_non_aws_skips_profile(monkeypatch, 
     res = tool.handler(provider="azure", profile="myprofile", report_dir=report_dir)
     assert res["success"] is True
     assert captured["cmd"] == ["scout", "azure", "--report-dir", report_dir]
+    assert res["report_directory"] == report_dir
+    assert Path(report_dir).is_dir()
 
 
 def test_cloudmapper_run_handler_invocation(monkeypatch):
@@ -131,6 +133,16 @@ def test_kube_hunter_scan_handler_invocation_default_pod(monkeypatch):
     assert captured["cmd"] == ["kube-hunter", "--pod", "--report", "json"]
 
 
+def test_kube_hunter_scan_handler_invocation_target_takes_priority_over_cidr(monkeypatch):
+    captured = _mock_execute(monkeypatch)
+    tool = ToolRegistry.get("kube_hunter_scan")
+
+    res = tool.handler(target="10.0.0.1", cidr="10.0.0.0/24", report="json")
+    assert res["success"] is True
+    assert captured["cmd"] == ["kube-hunter", "--remote", "10.0.0.1", "--report", "json"]
+    assert "--cidr" not in captured["cmd"]
+
+
 def test_kube_bench_scan_handler_invocation(monkeypatch):
     captured = _mock_execute(monkeypatch)
     tool = ToolRegistry.get("kube_bench_scan")
@@ -143,6 +155,15 @@ def test_kube_bench_scan_handler_invocation(monkeypatch):
         "kube-bench", "--targets", "master,node", "--version", "1.23", "--config-dir", "/etc/kube-bench",
         "--outputfile", "/tmp/kube-bench-results.json", "--json", "-v",
     ]
+
+
+def test_kube_bench_scan_handler_invocation_non_json_format(monkeypatch):
+    captured = _mock_execute(monkeypatch)
+    tool = ToolRegistry.get("kube_bench_scan")
+
+    res = tool.handler(output_format="junit")
+    assert res["success"] is True
+    assert captured["cmd"] == ["kube-bench", "--outputfile", "/tmp/kube-bench-results.junit", "--json"]
 
 
 def test_docker_bench_security_scan_handler_invocation(monkeypatch):
@@ -158,6 +179,7 @@ def test_docker_bench_security_scan_handler_invocation(monkeypatch):
 
     res2 = tool.handler()
     assert res2["output_file"] == "/tmp/docker-bench-results.json"
+    assert captured["cmd"] == ["docker-bench-security", "-l", "/tmp/docker-bench-results.json"]
 
 
 def test_falco_scan_handler_invocation(monkeypatch):
@@ -169,6 +191,15 @@ def test_falco_scan_handler_invocation(monkeypatch):
     res = tool.handler(config_file="/tmp/falco.yaml", rules_file="/tmp/rules.yaml", output_format="json", duration=30, additional_args="-v")
     assert res["success"] is True
     assert captured["cmd"] == ["timeout", "30", "falco", "--config", "/tmp/falco.yaml", "--rules", "/tmp/rules.yaml", "--json", "-v"]
+
+
+def test_falco_scan_handler_invocation_non_json_format(monkeypatch):
+    captured = _mock_execute(monkeypatch)
+    tool = ToolRegistry.get("falco_scan")
+
+    res = tool.handler(output_format="text")
+    assert res["success"] is True
+    assert "--json" not in captured["cmd"]
 
 
 def test_clair_scan_handler_invocation(monkeypatch):
@@ -218,8 +249,6 @@ def test_terrascan_scan_handler_invocation(monkeypatch):
 
 
 def test_cloud_category_has_11_tools():
-    from hexstrike.core.registry import ToolRegistry
-    import hexstrike.tools
     cloud_tools = ToolRegistry.get_by_category("cloud")
     assert len(cloud_tools) == 11
     names = {t.name for t in cloud_tools}
