@@ -1,4 +1,3 @@
-import pytest
 from hexstrike.core.registry import ToolRegistry
 from hexstrike.core.process import default_process_manager
 import hexstrike.tools
@@ -62,6 +61,7 @@ def test_arp_scan_handler_invocation(monkeypatch):
     assert captured["cmd"] == ["arp-scan", "-t", "200", "-r", "5", "-I", "eth0", "-l", "-v"]
 
     res2 = tool.handler(target="192.168.1.1")
+    assert res2["success"] is True
     assert captured["cmd"] == ["arp-scan", "-t", "500", "-r", "3", "192.168.1.1"]
 
 
@@ -80,6 +80,7 @@ def test_autorecon_scan_handler_invocation(monkeypatch):
     ]
 
     res2 = tool.handler(target="10.0.0.5", port_scans="default", service_scans="all", additional_args="-vv")
+    assert res2["success"] is True
     assert captured["cmd"] == [
         "autorecon", "10.0.0.5", "-o", "/tmp/autorecon",
         "--heartbeat", "60", "--timeout", "300",
@@ -109,6 +110,7 @@ def test_enum4linux_scan_handler_invocation(monkeypatch):
     assert captured["cmd"] == ["enum4linux", "-a", "10.0.0.1"]
 
     res2 = tool.handler(target="10.0.0.1", additional_args="-u guest")
+    assert res2["success"] is True
     assert captured["cmd"] == ["enum4linux", "-u", "guest", "10.0.0.1"]
 
 
@@ -259,8 +261,6 @@ def test_nmap_advanced_scan_handler_stealth_aggressive_custom_scripts(monkeypatc
 
 
 def test_network_category_has_16_tools():
-    from hexstrike.core.registry import ToolRegistry
-    import hexstrike.tools
     network_tools = ToolRegistry.get_by_category("network")
     assert len(network_tools) == 16
     names = {t.name for t in network_tools}

@@ -275,7 +275,7 @@ def subfinder_enum(domain: str, silent: bool = True, all_sources: bool = False, 
     endpoint="/api/tools/nmap-advanced"
 )
 def nmap_advanced_scan(target: str, scan_type: str = "-sS", ports: Optional[str] = None, timing: str = "T4", nse_scripts: Optional[str] = None, os_detection: bool = False, version_detection: bool = False, aggressive: bool = False, stealth: bool = False, additional_args: Optional[str] = None) -> Dict[str, Any]:
-    cmd = ["nmap", scan_type, target]
+    cmd = ["nmap"] + scan_type.split() + [target]
     if ports:
         cmd.extend(["-p", ports])
     if stealth:
