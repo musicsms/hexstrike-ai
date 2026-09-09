@@ -52,3 +52,21 @@ def masscan_scan(target: str, ports: str = "1-65535", rate: int = 1000, interfac
     if additional_args:
         cmd.extend(additional_args.split())
     return run_tool_command(cmd)
+
+@ToolRegistry.register(
+    name="arp_scan",
+    category="network",
+    description="Network discovery using arp-scan",
+    endpoint="/api/tools/arp-scan"
+)
+def arp_scan(target: Optional[str] = None, interface: Optional[str] = None, local_network: bool = False, timeout: int = 500, retry: int = 3, additional_args: Optional[str] = None) -> Dict[str, Any]:
+    cmd = ["arp-scan", "-t", str(timeout), "-r", str(retry)]
+    if interface:
+        cmd.extend(["-I", interface])
+    if local_network:
+        cmd.append("-l")
+    else:
+        cmd.append(target)
+    if additional_args:
+        cmd.extend(additional_args.split())
+    return run_tool_command(cmd)

@@ -43,3 +43,23 @@ def test_masscan_scan_handler_invocation(monkeypatch):
         "--banners",
         "--wait", "5",
     ]
+
+
+def test_arp_scan_handler_invocation(monkeypatch):
+    captured = _mock_execute(monkeypatch)
+    tool = ToolRegistry.get("arp_scan")
+    assert tool is not None
+    assert tool.endpoint == "/api/tools/arp-scan"
+
+    res = tool.handler(
+        interface="eth0",
+        local_network=True,
+        timeout=200,
+        retry=5,
+        additional_args="-v",
+    )
+    assert res["success"] is True
+    assert captured["cmd"] == ["arp-scan", "-t", "200", "-r", "5", "-I", "eth0", "-l", "-v"]
+
+    res2 = tool.handler(target="192.168.1.1")
+    assert captured["cmd"] == ["arp-scan", "-t", "500", "-r", "3", "192.168.1.1"]
