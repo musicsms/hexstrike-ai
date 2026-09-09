@@ -169,3 +169,14 @@ def test_katana_crawl_handler_invocation(monkeypatch):
     res = tool.handler(url="http://x.com", depth=5, js_crawl=True, form_extraction=True, output_format="json", additional_args="-silent")
     assert res["success"] is True
     assert captured["cmd"] == ["katana", "-u", "http://x.com", "-d", "5", "-jc", "-fx", "-jsonl", "-silent"]
+
+
+def test_nikto_scan_handler_invocation(monkeypatch):
+    captured = _mock_execute(monkeypatch)
+    tool = ToolRegistry.get("nikto_scan")
+    assert tool is not None
+    assert tool.endpoint == "/api/tools/nikto"
+
+    res = tool.handler(target="http://x.com", additional_args="-Tuning 1")
+    assert res["success"] is True
+    assert captured["cmd"] == ["nikto", "-h", "http://x.com", "-Tuning", "1"]

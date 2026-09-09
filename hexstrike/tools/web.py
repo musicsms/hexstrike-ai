@@ -207,3 +207,15 @@ def katana_crawl(url: str, depth: int = 3, js_crawl: bool = True, form_extractio
     if additional_args:
         cmd.extend(additional_args.split())
     return run_tool_command(cmd)
+
+@ToolRegistry.register(
+    name="nikto_scan",
+    category="web",
+    description="Web server vulnerability scanning using Nikto",
+    endpoint="/api/tools/nikto"
+)
+def nikto_scan(target: str, additional_args: Optional[str] = None) -> Dict[str, Any]:
+    cmd = ["nikto", "-h", target]
+    if additional_args:
+        cmd.extend(additional_args.split())
+    return run_tool_command(cmd)
