@@ -233,3 +233,21 @@ def rpcclient_enum(target: str, username: Optional[str] = None, password: Option
     if additional_args:
         cmd.extend(additional_args.split())
     return run_tool_command(cmd)
+
+@ToolRegistry.register(
+    name="smbmap_scan",
+    category="network",
+    description="SMB share enumeration using SMBMap",
+    endpoint="/api/tools/smbmap"
+)
+def smbmap_scan(target: str, username: Optional[str] = None, password: Optional[str] = None, domain: Optional[str] = None, additional_args: Optional[str] = None) -> Dict[str, Any]:
+    cmd = ["smbmap", "-H", target]
+    if username:
+        cmd.extend(["-u", username])
+    if password:
+        cmd.extend(["-p", password])
+    if domain:
+        cmd.extend(["-d", domain])
+    if additional_args:
+        cmd.extend(additional_args.split())
+    return run_tool_command(cmd)

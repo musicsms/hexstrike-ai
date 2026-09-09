@@ -209,3 +209,14 @@ def test_rpcclient_enum_handler_invocation_anonymous(monkeypatch):
     assert captured["cmd"] == [
         "rpcclient", "-U", "", "10.0.0.5", "-c", "enumdomusers;enumdomgroups;querydominfo",
     ]
+
+
+def test_smbmap_scan_handler_invocation(monkeypatch):
+    captured = _mock_execute(monkeypatch)
+    tool = ToolRegistry.get("smbmap_scan")
+    assert tool is not None
+    assert tool.endpoint == "/api/tools/smbmap"
+
+    res = tool.handler(target="10.0.0.5", username="guest", password="pass", domain="WORKGROUP", additional_args="-R")
+    assert res["success"] is True
+    assert captured["cmd"] == ["smbmap", "-H", "10.0.0.5", "-u", "guest", "-p", "pass", "-d", "WORKGROUP", "-R"]
