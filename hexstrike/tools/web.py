@@ -305,3 +305,19 @@ def wpscan_scan(url: str, additional_args: Optional[str] = None) -> Dict[str, An
     if additional_args:
         cmd.extend(additional_args.split())
     return run_tool_command(cmd)
+
+@ToolRegistry.register(
+    name="x8_scan",
+    category="web",
+    description="Hidden parameter discovery using x8",
+    endpoint="/api/tools/x8"
+)
+def x8_scan(url: str, wordlist: str = "/usr/share/wordlists/x8/params.txt", method: str = "GET", body: Optional[str] = None, headers: Optional[str] = None, additional_args: Optional[str] = None) -> Dict[str, Any]:
+    cmd = ["x8", "-u", url, "-w", wordlist, "-X", method]
+    if body:
+        cmd.extend(["-b", body])
+    if headers:
+        cmd.extend(["-H", headers])
+    if additional_args:
+        cmd.extend(additional_args.split())
+    return run_tool_command(cmd)

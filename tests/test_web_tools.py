@@ -246,3 +246,14 @@ def test_wpscan_scan_handler_invocation(monkeypatch):
     res = tool.handler(url="http://x.com", additional_args="--enumerate p")
     assert res["success"] is True
     assert captured["cmd"] == ["wpscan", "--url", "http://x.com", "--enumerate", "p"]
+
+
+def test_x8_scan_handler_invocation(monkeypatch):
+    captured = _mock_execute(monkeypatch)
+    tool = ToolRegistry.get("x8_scan")
+    assert tool is not None
+    assert tool.endpoint == "/api/tools/x8"
+
+    res = tool.handler(url="http://x.com", wordlist="/tmp/wl.txt", method="POST", body="a=1", headers="X-Test: 1", additional_args="-v")
+    assert res["success"] is True
+    assert captured["cmd"] == ["x8", "-u", "http://x.com", "-w", "/tmp/wl.txt", "-X", "POST", "-b", "a=1", "-H", "X-Test: 1", "-v"]
