@@ -181,3 +181,31 @@ def test_responder_capture_handler_invocation(monkeypatch):
     )
     assert res["success"] is True
     assert captured["cmd"] == ["timeout", "60", "responder", "-I", "eth0", "-A", "-w", "-F", "-f", "--verbose"]
+
+
+def test_rpcclient_enum_handler_invocation_authenticated(monkeypatch):
+    captured = _mock_execute(monkeypatch)
+    tool = ToolRegistry.get("rpcclient_enum")
+    assert tool is not None
+    assert tool.endpoint == "/api/tools/rpcclient"
+
+    res = tool.handler(
+        target="10.0.0.5", username="admin", password="Pass123", domain="CORP",
+        commands="enumdomusers;enumdomgroups", additional_args="--timeout=10",
+    )
+    assert res["success"] is True
+    assert captured["cmd"] == [
+        "rpcclient", "-U", "admin%Pass123", "-W", "CORP",
+        "10.0.0.5", "-c", "enumdomusers;enumdomgroups", "--timeout=10",
+    ]
+
+
+def test_rpcclient_enum_handler_invocation_anonymous(monkeypatch):
+    captured = _mock_execute(monkeypatch)
+    tool = ToolRegistry.get("rpcclient_enum")
+
+    res = tool.handler(target="10.0.0.5")
+    assert res["success"] is True
+    assert captured["cmd"] == [
+        "rpcclient", "-U", "", "10.0.0.5", "-c", "enumdomusers;enumdomgroups;querydominfo",
+    ]

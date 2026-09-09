@@ -212,3 +212,24 @@ def responder_capture(interface: str = "eth0", analyze: bool = False, wpad: bool
     if additional_args:
         cmd.extend(additional_args.split())
     return run_tool_command(cmd)
+
+@ToolRegistry.register(
+    name="rpcclient_enum",
+    category="network",
+    description="RPC enumeration using rpcclient",
+    endpoint="/api/tools/rpcclient"
+)
+def rpcclient_enum(target: str, username: Optional[str] = None, password: Optional[str] = None, domain: Optional[str] = None, commands: str = "enumdomusers;enumdomgroups;querydominfo", additional_args: Optional[str] = None) -> Dict[str, Any]:
+    cmd = ["rpcclient"]
+    if username and password:
+        cmd.extend(["-U", f"{username}%{password}"])
+    elif username:
+        cmd.extend(["-U", username])
+    else:
+        cmd.extend(["-U", ""])
+    if domain:
+        cmd.extend(["-W", domain])
+    cmd.extend([target, "-c", commands])
+    if additional_args:
+        cmd.extend(additional_args.split())
+    return run_tool_command(cmd)
