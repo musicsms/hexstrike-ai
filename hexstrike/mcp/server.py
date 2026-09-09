@@ -1,5 +1,7 @@
 import argparse
 import sys
+import functools
+import inspect
 from fastmcp import FastMCP
 from hexstrike.core.config import DEFAULT_HEXSTRIKE_SERVER, COMMAND_TIMEOUT
 from hexstrike.core.registry import ToolRegistry
@@ -13,16 +15,19 @@ def setup_mcp_server(client: HexStrikeClient) -> FastMCP:
         tool_name = spec.name
         tool_desc = spec.description
         endpoint = spec.endpoint
+        handler = spec.handler
 
-        def make_tool(ep):
-            def tool_func(**kwargs):
-                return client.execute_tool(ep, kwargs)
+        def make_tool(func, ep):
+            @functools.wraps(func)
+            def tool_func(*args, **kwargs):
+                sig = inspect.signature(func)
+                bound = sig.bind(*args, **kwargs)
+                bound.apply_defaults()
+                return client.execute_tool(ep, bound.arguments)
             return tool_func
 
-        func = make_tool(endpoint)
-        func.__name__ = tool_name
-        func.__doc__ = tool_desc
-        mcp.tool()(func)
+        wrapped = make_tool(handler, endpoint)
+        mcp.tool()(wrapped)
 
     return mcp
 
