@@ -157,3 +157,18 @@ def fierce_scan(domain: str, dns_server: Optional[str] = None, additional_args: 
     if additional_args:
         cmd.extend(additional_args.split())
     return run_tool_command(cmd)
+
+@ToolRegistry.register(
+    name="nbtscan_scan",
+    category="network",
+    description="NetBIOS name scanning using nbtscan",
+    endpoint="/api/tools/nbtscan"
+)
+def nbtscan_scan(target: str, verbose: bool = False, timeout: int = 2, additional_args: Optional[str] = None) -> Dict[str, Any]:
+    cmd = ["nbtscan", "-t", str(timeout)]
+    if verbose:
+        cmd.append("-v")
+    cmd.append(target)
+    if additional_args:
+        cmd.extend(additional_args.split())
+    return run_tool_command(cmd)

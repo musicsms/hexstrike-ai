@@ -138,3 +138,14 @@ def test_fierce_scan_handler_invocation(monkeypatch):
     res = tool.handler(domain="example.com", dns_server="8.8.8.8", additional_args="--wide")
     assert res["success"] is True
     assert captured["cmd"] == ["fierce", "--domain", "example.com", "--dns-servers", "8.8.8.8", "--wide"]
+
+
+def test_nbtscan_scan_handler_invocation(monkeypatch):
+    captured = _mock_execute(monkeypatch)
+    tool = ToolRegistry.get("nbtscan_scan")
+    assert tool is not None
+    assert tool.endpoint == "/api/tools/nbtscan"
+
+    res = tool.handler(target="192.168.1.0/24", verbose=True, timeout=5, additional_args="-r")
+    assert res["success"] is True
+    assert captured["cmd"] == ["nbtscan", "-t", "5", "-v", "192.168.1.0/24", "-r"]
