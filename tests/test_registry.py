@@ -1,6 +1,12 @@
 import pytest
 from hexstrike.core.registry import ToolRegistry, ToolSpec
 
+@pytest.fixture(autouse=True)
+def preserve_registry():
+    saved = dict(ToolRegistry._tools)
+    yield
+    ToolRegistry._tools = saved
+
 def test_tool_registry_registration():
     ToolRegistry.clear()
 
