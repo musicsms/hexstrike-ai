@@ -220,3 +220,14 @@ def test_smbmap_scan_handler_invocation(monkeypatch):
     res = tool.handler(target="10.0.0.5", username="guest", password="pass", domain="WORKGROUP", additional_args="-R")
     assert res["success"] is True
     assert captured["cmd"] == ["smbmap", "-H", "10.0.0.5", "-u", "guest", "-p", "pass", "-d", "WORKGROUP", "-R"]
+
+
+def test_subfinder_enum_handler_invocation(monkeypatch):
+    captured = _mock_execute(monkeypatch)
+    tool = ToolRegistry.get("subfinder_enum")
+    assert tool is not None
+    assert tool.endpoint == "/api/tools/subfinder"
+
+    res = tool.handler(domain="example.com", silent=True, all_sources=True, additional_args="-timeout 30")
+    assert res["success"] is True
+    assert captured["cmd"] == ["subfinder", "-d", "example.com", "-silent", "-all", "-timeout", "30"]

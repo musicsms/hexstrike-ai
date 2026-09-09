@@ -251,3 +251,19 @@ def smbmap_scan(target: str, username: Optional[str] = None, password: Optional[
     if additional_args:
         cmd.extend(additional_args.split())
     return run_tool_command(cmd)
+
+@ToolRegistry.register(
+    name="subfinder_enum",
+    category="network",
+    description="Passive subdomain enumeration using Subfinder",
+    endpoint="/api/tools/subfinder"
+)
+def subfinder_enum(domain: str, silent: bool = True, all_sources: bool = False, additional_args: Optional[str] = None) -> Dict[str, Any]:
+    cmd = ["subfinder", "-d", domain]
+    if silent:
+        cmd.append("-silent")
+    if all_sources:
+        cmd.append("-all")
+    if additional_args:
+        cmd.extend(additional_args.split())
+    return run_tool_command(cmd)
