@@ -104,3 +104,13 @@ def dnsenum_scan(domain: str, dns_server: Optional[str] = None, wordlist: Option
     if additional_args:
         cmd.extend(additional_args.split())
     return run_tool_command(cmd)
+
+@ToolRegistry.register(
+    name="enum4linux_scan",
+    category="network",
+    description="SMB/Windows enumeration using enum4linux",
+    endpoint="/api/tools/enum4linux"
+)
+def enum4linux_scan(target: str, additional_args: str = "-a") -> Dict[str, Any]:
+    cmd = ["enum4linux"] + additional_args.split() + [target]
+    return run_tool_command(cmd)

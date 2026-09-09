@@ -96,3 +96,17 @@ def test_dnsenum_scan_handler_invocation(monkeypatch):
     res = tool.handler(domain="example.com", dns_server="8.8.8.8", wordlist="/tmp/wl.txt", additional_args="--threads 5")
     assert res["success"] is True
     assert captured["cmd"] == ["dnsenum", "example.com", "--dnsserver", "8.8.8.8", "--file", "/tmp/wl.txt", "--threads", "5"]
+
+
+def test_enum4linux_scan_handler_invocation(monkeypatch):
+    captured = _mock_execute(monkeypatch)
+    tool = ToolRegistry.get("enum4linux_scan")
+    assert tool is not None
+    assert tool.endpoint == "/api/tools/enum4linux"
+
+    res = tool.handler(target="10.0.0.1")
+    assert res["success"] is True
+    assert captured["cmd"] == ["enum4linux", "-a", "10.0.0.1"]
+
+    res2 = tool.handler(target="10.0.0.1", additional_args="-u guest")
+    assert captured["cmd"] == ["enum4linux", "-u", "guest", "10.0.0.1"]
