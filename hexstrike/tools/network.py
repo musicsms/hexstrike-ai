@@ -88,3 +88,19 @@ def autorecon_scan(target: str, output_dir: str = "/tmp/autorecon", port_scans: 
     if additional_args:
         cmd.extend(additional_args.split())
     return run_tool_command(cmd)
+
+@ToolRegistry.register(
+    name="dnsenum_scan",
+    category="network",
+    description="DNS enumeration using dnsenum",
+    endpoint="/api/tools/dnsenum"
+)
+def dnsenum_scan(domain: str, dns_server: Optional[str] = None, wordlist: Optional[str] = None, additional_args: Optional[str] = None) -> Dict[str, Any]:
+    cmd = ["dnsenum", domain]
+    if dns_server:
+        cmd.extend(["--dnsserver", dns_server])
+    if wordlist:
+        cmd.extend(["--file", wordlist])
+    if additional_args:
+        cmd.extend(additional_args.split())
+    return run_tool_command(cmd)
