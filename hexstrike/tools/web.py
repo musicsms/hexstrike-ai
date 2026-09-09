@@ -39,3 +39,21 @@ def sqlmap_scan(url: str, batch: bool = True, additional_args: Optional[str] = N
     if additional_args:
         cmd.extend(additional_args.split())
     return run_tool_command(cmd)
+
+@ToolRegistry.register(
+    name="arjun_scan",
+    category="web",
+    description="HTTP parameter discovery using Arjun",
+    endpoint="/api/tools/arjun"
+)
+def arjun_scan(url: str, method: str = "GET", wordlist: Optional[str] = None, delay: int = 0, threads: int = 25, stable: bool = False, additional_args: Optional[str] = None) -> Dict[str, Any]:
+    cmd = ["arjun", "-u", url, "-m", method, "-t", str(threads)]
+    if wordlist:
+        cmd.extend(["-w", wordlist])
+    if delay > 0:
+        cmd.extend(["-d", str(delay)])
+    if stable:
+        cmd.append("--stable")
+    if additional_args:
+        cmd.extend(additional_args.split())
+    return run_tool_command(cmd)
