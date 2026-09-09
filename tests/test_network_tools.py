@@ -63,3 +63,25 @@ def test_arp_scan_handler_invocation(monkeypatch):
 
     res2 = tool.handler(target="192.168.1.1")
     assert captured["cmd"] == ["arp-scan", "-t", "500", "-r", "3", "192.168.1.1"]
+
+
+def test_autorecon_scan_handler_invocation(monkeypatch):
+    captured = _mock_execute(monkeypatch)
+    tool = ToolRegistry.get("autorecon_scan")
+    assert tool is not None
+    assert tool.endpoint == "/api/tools/autorecon"
+
+    res = tool.handler(target="10.0.0.5")
+    assert res["success"] is True
+    assert captured["cmd"] == [
+        "autorecon", "10.0.0.5", "-o", "/tmp/autorecon",
+        "--heartbeat", "60", "--timeout", "300",
+        "--port-scans", "top-100-ports",
+    ]
+
+    res2 = tool.handler(target="10.0.0.5", port_scans="default", service_scans="all", additional_args="-vv")
+    assert captured["cmd"] == [
+        "autorecon", "10.0.0.5", "-o", "/tmp/autorecon",
+        "--heartbeat", "60", "--timeout", "300",
+        "--service-scans", "all", "-vv",
+    ]

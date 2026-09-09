@@ -70,3 +70,21 @@ def arp_scan(target: Optional[str] = None, interface: Optional[str] = None, loca
     if additional_args:
         cmd.extend(additional_args.split())
     return run_tool_command(cmd)
+
+@ToolRegistry.register(
+    name="autorecon_scan",
+    category="network",
+    description="Comprehensive automated reconnaissance using AutoRecon",
+    endpoint="/api/tools/autorecon"
+)
+def autorecon_scan(target: str, output_dir: str = "/tmp/autorecon", port_scans: str = "top-100-ports", service_scans: str = "default", heartbeat: int = 60, timeout: int = 300, additional_args: Optional[str] = None) -> Dict[str, Any]:
+    cmd = ["autorecon", target, "-o", output_dir, "--heartbeat", str(heartbeat), "--timeout", str(timeout)]
+    # Preserves original quirk: default ("top-100-ports") differs from the "default" sentinel,
+    # so --port-scans is emitted unless the caller explicitly passes "default".
+    if port_scans != "default":
+        cmd.extend(["--port-scans", port_scans])
+    if service_scans != "default":
+        cmd.extend(["--service-scans", service_scans])
+    if additional_args:
+        cmd.extend(additional_args.split())
+    return run_tool_command(cmd)
