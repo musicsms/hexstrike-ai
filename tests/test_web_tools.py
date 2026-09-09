@@ -257,3 +257,14 @@ def test_x8_scan_handler_invocation(monkeypatch):
     res = tool.handler(url="http://x.com", wordlist="/tmp/wl.txt", method="POST", body="a=1", headers="X-Test: 1", additional_args="-v")
     assert res["success"] is True
     assert captured["cmd"] == ["x8", "-u", "http://x.com", "-w", "/tmp/wl.txt", "-X", "POST", "-b", "a=1", "-H", "X-Test: 1", "-v"]
+
+
+def test_xsser_scan_handler_invocation(monkeypatch):
+    captured = _mock_execute(monkeypatch)
+    tool = ToolRegistry.get("xsser_scan")
+    assert tool is not None
+    assert tool.endpoint == "/api/tools/xsser"
+
+    res = tool.handler(url="http://x.com", params="id=1", additional_args="--Fp")
+    assert res["success"] is True
+    assert captured["cmd"] == ["xsser", "--url", "http://x.com", "--param=id=1", "--Fp"]

@@ -321,3 +321,17 @@ def x8_scan(url: str, wordlist: str = "/usr/share/wordlists/x8/params.txt", meth
     if additional_args:
         cmd.extend(additional_args.split())
     return run_tool_command(cmd)
+
+@ToolRegistry.register(
+    name="xsser_scan",
+    category="web",
+    description="XSS vulnerability testing using XSSer",
+    endpoint="/api/tools/xsser"
+)
+def xsser_scan(url: str, params: Optional[str] = None, additional_args: Optional[str] = None) -> Dict[str, Any]:
+    cmd = ["xsser", "--url", url]
+    if params:
+        cmd.append(f"--param={params}")
+    if additional_args:
+        cmd.extend(additional_args.split())
+    return run_tool_command(cmd)
