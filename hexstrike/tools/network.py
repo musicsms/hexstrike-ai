@@ -114,3 +114,32 @@ def dnsenum_scan(domain: str, dns_server: Optional[str] = None, wordlist: Option
 def enum4linux_scan(target: str, additional_args: str = "-a") -> Dict[str, Any]:
     cmd = ["enum4linux"] + additional_args.split() + [target]
     return run_tool_command(cmd)
+
+@ToolRegistry.register(
+    name="enum4linux_ng_scan",
+    category="network",
+    description="Advanced SMB enumeration using enum4linux-ng",
+    endpoint="/api/tools/enum4linux-ng"
+)
+def enum4linux_ng_scan(target: str, username: Optional[str] = None, password: Optional[str] = None, domain: Optional[str] = None, shares: bool = True, users: bool = True, groups: bool = True, policy: bool = True, additional_args: Optional[str] = None) -> Dict[str, Any]:
+    cmd = ["enum4linux-ng", target]
+    if username:
+        cmd.extend(["-u", username])
+    if password:
+        cmd.extend(["-p", password])
+    if domain:
+        cmd.extend(["-d", domain])
+    enum_options = []
+    if shares:
+        enum_options.append("S")
+    if users:
+        enum_options.append("U")
+    if groups:
+        enum_options.append("G")
+    if policy:
+        enum_options.append("P")
+    if enum_options:
+        cmd.extend(["-A", ",".join(enum_options)])
+    if additional_args:
+        cmd.extend(additional_args.split())
+    return run_tool_command(cmd)

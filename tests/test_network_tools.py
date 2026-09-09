@@ -110,3 +110,20 @@ def test_enum4linux_scan_handler_invocation(monkeypatch):
 
     res2 = tool.handler(target="10.0.0.1", additional_args="-u guest")
     assert captured["cmd"] == ["enum4linux", "-u", "guest", "10.0.0.1"]
+
+
+def test_enum4linux_ng_scan_handler_invocation(monkeypatch):
+    captured = _mock_execute(monkeypatch)
+    tool = ToolRegistry.get("enum4linux_ng_scan")
+    assert tool is not None
+    assert tool.endpoint == "/api/tools/enum4linux-ng"
+
+    res = tool.handler(
+        target="10.0.0.1", username="admin", password="pass123", domain="CORP",
+        shares=True, users=True, groups=False, policy=True, additional_args="--verbose",
+    )
+    assert res["success"] is True
+    assert captured["cmd"] == [
+        "enum4linux-ng", "10.0.0.1", "-u", "admin", "-p", "pass123", "-d", "CORP",
+        "-A", "S,U,P", "--verbose",
+    ]
