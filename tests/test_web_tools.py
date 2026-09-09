@@ -127,3 +127,20 @@ def test_gau_discover_handler_invocation_custom_providers(monkeypatch):
     res = tool.handler(domain="example.com", providers="wayback", include_subs=False, blacklist="")
     assert res["success"] is True
     assert captured["cmd"] == ["gau", "example.com", "--providers", "wayback"]
+
+
+def test_httpx_probe_handler_invocation(monkeypatch):
+    captured = _mock_execute(monkeypatch)
+    tool = ToolRegistry.get("httpx_probe")
+    assert tool is not None
+    assert tool.endpoint == "/api/tools/httpx"
+
+    res = tool.handler(
+        target="http://x.com", probe=True, tech_detect=True, status_code=True,
+        content_length=True, title=True, web_server=True, threads=25, additional_args="-json",
+    )
+    assert res["success"] is True
+    assert captured["cmd"] == [
+        "httpx", "-l", "http://x.com", "-t", "25",
+        "-probe", "-tech-detect", "-sc", "-cl", "-title", "-server", "-json",
+    ]

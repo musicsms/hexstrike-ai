@@ -149,3 +149,27 @@ def gau_discover(domain: str, providers: str = "wayback,commoncrawl,otx,urlscan"
     if additional_args:
         cmd.extend(additional_args.split())
     return run_tool_command(cmd)
+
+@ToolRegistry.register(
+    name="httpx_probe",
+    category="web",
+    description="Fast HTTP probing and technology detection using httpx",
+    endpoint="/api/tools/httpx"
+)
+def httpx_probe(target: str, probe: bool = True, tech_detect: bool = False, status_code: bool = False, content_length: bool = False, title: bool = False, web_server: bool = False, threads: int = 50, additional_args: Optional[str] = None) -> Dict[str, Any]:
+    cmd = ["httpx", "-l", target, "-t", str(threads)]
+    if probe:
+        cmd.append("-probe")
+    if tech_detect:
+        cmd.append("-tech-detect")
+    if status_code:
+        cmd.append("-sc")
+    if content_length:
+        cmd.append("-cl")
+    if title:
+        cmd.append("-title")
+    if web_server:
+        cmd.append("-server")
+    if additional_args:
+        cmd.extend(additional_args.split())
+    return run_tool_command(cmd)
