@@ -33,3 +33,29 @@ def test_arjun_scan_handler_invocation(monkeypatch):
         "arjun", "-u", "http://x.com", "-m", "POST", "-t", "10",
         "-w", "/tmp/wl.txt", "-d", "2", "--stable", "--include", "X",
     ]
+
+
+def test_dalfox_scan_handler_invocation_url_mode(monkeypatch):
+    captured = _mock_execute(monkeypatch)
+    tool = ToolRegistry.get("dalfox_scan")
+    assert tool is not None
+    assert tool.endpoint == "/api/tools/dalfox"
+
+    res = tool.handler(
+        url="http://x.com", blind=True, mining_dom=True, mining_dict=True,
+        custom_payload="<script>", additional_args="--silence",
+    )
+    assert res["success"] is True
+    assert captured["cmd"] == [
+        "dalfox", "url", "http://x.com", "--blind", "--mining-dom", "--mining-dict",
+        "--custom-payload", "<script>", "--silence",
+    ]
+
+
+def test_dalfox_scan_handler_invocation_pipe_mode(monkeypatch):
+    captured = _mock_execute(monkeypatch)
+    tool = ToolRegistry.get("dalfox_scan")
+
+    res = tool.handler(pipe_mode=True, mining_dom=False, mining_dict=False)
+    assert res["success"] is True
+    assert captured["cmd"] == ["dalfox", "pipe"]

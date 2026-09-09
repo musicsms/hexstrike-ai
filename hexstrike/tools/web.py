@@ -57,3 +57,26 @@ def arjun_scan(url: str, method: str = "GET", wordlist: Optional[str] = None, de
     if additional_args:
         cmd.extend(additional_args.split())
     return run_tool_command(cmd)
+
+@ToolRegistry.register(
+    name="dalfox_scan",
+    category="web",
+    description="Advanced XSS vulnerability scanning using Dalfox",
+    endpoint="/api/tools/dalfox"
+)
+def dalfox_scan(url: Optional[str] = None, pipe_mode: bool = False, blind: bool = False, mining_dom: bool = True, mining_dict: bool = True, custom_payload: Optional[str] = None, additional_args: Optional[str] = None) -> Dict[str, Any]:
+    if pipe_mode:
+        cmd = ["dalfox", "pipe"]
+    else:
+        cmd = ["dalfox", "url", url]
+    if blind:
+        cmd.append("--blind")
+    if mining_dom:
+        cmd.append("--mining-dom")
+    if mining_dict:
+        cmd.append("--mining-dict")
+    if custom_payload:
+        cmd.extend(["--custom-payload", custom_payload])
+    if additional_args:
+        cmd.extend(additional_args.split())
+    return run_tool_command(cmd)
