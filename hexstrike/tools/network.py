@@ -143,3 +143,17 @@ def enum4linux_ng_scan(target: str, username: Optional[str] = None, password: Op
     if additional_args:
         cmd.extend(additional_args.split())
     return run_tool_command(cmd)
+
+@ToolRegistry.register(
+    name="fierce_scan",
+    category="network",
+    description="DNS reconnaissance using fierce",
+    endpoint="/api/tools/fierce"
+)
+def fierce_scan(domain: str, dns_server: Optional[str] = None, additional_args: Optional[str] = None) -> Dict[str, Any]:
+    cmd = ["fierce", "--domain", domain]
+    if dns_server:
+        cmd.extend(["--dns-servers", dns_server])
+    if additional_args:
+        cmd.extend(additional_args.split())
+    return run_tool_command(cmd)

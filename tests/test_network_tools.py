@@ -127,3 +127,14 @@ def test_enum4linux_ng_scan_handler_invocation(monkeypatch):
         "enum4linux-ng", "10.0.0.1", "-u", "admin", "-p", "pass123", "-d", "CORP",
         "-A", "S,U,P", "--verbose",
     ]
+
+
+def test_fierce_scan_handler_invocation(monkeypatch):
+    captured = _mock_execute(monkeypatch)
+    tool = ToolRegistry.get("fierce_scan")
+    assert tool is not None
+    assert tool.endpoint == "/api/tools/fierce"
+
+    res = tool.handler(domain="example.com", dns_server="8.8.8.8", additional_args="--wide")
+    assert res["success"] is True
+    assert captured["cmd"] == ["fierce", "--domain", "example.com", "--dns-servers", "8.8.8.8", "--wide"]
