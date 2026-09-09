@@ -25,3 +25,24 @@ def prowler_scan(provider: str = "aws", profile: Optional[str] = "default", regi
     result = run_tool_command(cmd)
     result["output_directory"] = output_dir
     return result
+
+@ToolRegistry.register(
+    name="trivy_scan",
+    category="cloud",
+    description="Container/filesystem vulnerability scanning using Trivy",
+    endpoint="/api/tools/trivy"
+)
+def trivy_scan(target: str, scan_type: str = "image", output_format: str = "json", severity: Optional[str] = None, output_file: Optional[str] = None, additional_args: Optional[str] = None) -> Dict[str, Any]:
+    cmd = ["trivy", scan_type, target]
+    if output_format:
+        cmd.extend(["--format", output_format])
+    if severity:
+        cmd.extend(["--severity", severity])
+    if output_file:
+        cmd.extend(["--output", output_file])
+    if additional_args:
+        cmd.extend(additional_args.split())
+    result = run_tool_command(cmd)
+    if output_file:
+        result["output_file"] = output_file
+    return result

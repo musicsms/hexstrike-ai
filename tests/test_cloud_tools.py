@@ -42,3 +42,25 @@ def test_prowler_scan_handler_invocation(monkeypatch, tmp_path):
     ]
     assert res["output_directory"] == output_dir
     assert Path(output_dir).is_dir()
+
+
+def test_trivy_scan_handler_invocation(monkeypatch):
+    captured = _mock_execute(monkeypatch)
+    tool = ToolRegistry.get("trivy_scan")
+    assert tool is not None
+    assert tool.endpoint == "/api/tools/trivy"
+
+    res = tool.handler(
+        target="myimage:latest", scan_type="image", output_format="json",
+        severity="HIGH,CRITICAL", output_file="/tmp/out.json", additional_args="--timeout 5m",
+    )
+    assert res["success"] is True
+    assert captured["cmd"] == [
+        "trivy", "image", "myimage:latest",
+        "--format", "json", "--severity", "HIGH,CRITICAL", "--output", "/tmp/out.json",
+        "--timeout", "5m",
+    ]
+    assert res["output_file"] == "/tmp/out.json"
+
+    res2 = tool.handler(target="myimage:latest")
+    assert "output_file" not in res2
