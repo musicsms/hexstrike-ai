@@ -144,3 +144,17 @@ def test_httpx_probe_handler_invocation(monkeypatch):
         "httpx", "-l", "http://x.com", "-t", "25",
         "-probe", "-tech-detect", "-sc", "-cl", "-title", "-server", "-json",
     ]
+
+
+def test_jaeles_scan_handler_invocation(monkeypatch):
+    captured = _mock_execute(monkeypatch)
+    tool = ToolRegistry.get("jaeles_scan")
+    assert tool is not None
+    assert tool.endpoint == "/api/tools/jaeles"
+
+    res = tool.handler(url="http://x.com", signatures="/tmp/sigs", config="/tmp/cfg", threads=5, timeout=10, additional_args="-v")
+    assert res["success"] is True
+    assert captured["cmd"] == [
+        "jaeles", "scan", "-u", "http://x.com", "-c", "5", "--timeout", "10",
+        "-s", "/tmp/sigs", "--config", "/tmp/cfg", "-v",
+    ]

@@ -173,3 +173,19 @@ def httpx_probe(target: str, probe: bool = True, tech_detect: bool = False, stat
     if additional_args:
         cmd.extend(additional_args.split())
     return run_tool_command(cmd)
+
+@ToolRegistry.register(
+    name="jaeles_scan",
+    category="web",
+    description="Advanced vulnerability scanning with custom signatures using Jaeles",
+    endpoint="/api/tools/jaeles"
+)
+def jaeles_scan(url: str, signatures: Optional[str] = None, config: Optional[str] = None, threads: int = 20, timeout: int = 20, additional_args: Optional[str] = None) -> Dict[str, Any]:
+    cmd = ["jaeles", "scan", "-u", url, "-c", str(threads), "--timeout", str(timeout)]
+    if signatures:
+        cmd.extend(["-s", signatures])
+    if config:
+        cmd.extend(["--config", config])
+    if additional_args:
+        cmd.extend(additional_args.split())
+    return run_tool_command(cmd)
