@@ -215,3 +215,16 @@ def test_terrascan_scan_handler_invocation(monkeypatch):
         "terrascan", "scan", "-t", "terraform", "-d", "/tmp/iac",
         "-p", "aws", "-o", "json", "--severity", "HIGH", "--non-recursive",
     ]
+
+
+def test_cloud_category_has_11_tools():
+    from hexstrike.core.registry import ToolRegistry
+    import hexstrike.tools
+    cloud_tools = ToolRegistry.get_by_category("cloud")
+    assert len(cloud_tools) == 11
+    names = {t.name for t in cloud_tools}
+    assert names == {
+        "prowler_scan", "trivy_scan", "scout_suite_scan", "cloudmapper_run",
+        "kube_hunter_scan", "kube_bench_scan", "docker_bench_security_scan",
+        "falco_scan", "clair_scan", "checkov_scan", "terrascan_scan",
+    }
