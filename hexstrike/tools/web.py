@@ -131,3 +131,21 @@ def feroxbuster_scan(url: str, wordlist: str = "/usr/share/wordlists/dirb/common
     if additional_args:
         cmd.extend(additional_args.split())
     return run_tool_command(cmd)
+
+@ToolRegistry.register(
+    name="gau_discover",
+    category="web",
+    description="URL discovery from multiple archive sources using Gau",
+    endpoint="/api/tools/gau"
+)
+def gau_discover(domain: str, providers: str = "wayback,commoncrawl,otx,urlscan", include_subs: bool = True, blacklist: str = "png,jpg,gif,jpeg,swf,woff,svg,pdf,css,ico", additional_args: Optional[str] = None) -> Dict[str, Any]:
+    cmd = ["gau", domain]
+    if providers != "wayback,commoncrawl,otx,urlscan":
+        cmd.extend(["--providers", providers])
+    if include_subs:
+        cmd.append("--subs")
+    if blacklist:
+        cmd.extend(["--blacklist", blacklist])
+    if additional_args:
+        cmd.extend(additional_args.split())
+    return run_tool_command(cmd)

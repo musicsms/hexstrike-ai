@@ -103,3 +103,27 @@ def test_feroxbuster_scan_handler_invocation(monkeypatch):
     res = tool.handler(url="http://x.com", wordlist="/tmp/wl.txt", threads=20, additional_args="-A")
     assert res["success"] is True
     assert captured["cmd"] == ["feroxbuster", "-u", "http://x.com", "-w", "/tmp/wl.txt", "-t", "20", "-A"]
+
+
+def test_gau_discover_handler_invocation_default_providers(monkeypatch):
+    captured = _mock_execute(monkeypatch)
+    tool = ToolRegistry.get("gau_discover")
+    assert tool is not None
+    assert tool.endpoint == "/api/tools/gau"
+
+    res = tool.handler(domain="example.com", additional_args="--threads 5")
+    assert res["success"] is True
+    assert captured["cmd"] == [
+        "gau", "example.com", "--subs",
+        "--blacklist", "png,jpg,gif,jpeg,swf,woff,svg,pdf,css,ico",
+        "--threads", "5",
+    ]
+
+
+def test_gau_discover_handler_invocation_custom_providers(monkeypatch):
+    captured = _mock_execute(monkeypatch)
+    tool = ToolRegistry.get("gau_discover")
+
+    res = tool.handler(domain="example.com", providers="wayback", include_subs=False, blacklist="")
+    assert res["success"] is True
+    assert captured["cmd"] == ["gau", "example.com", "--providers", "wayback"]
