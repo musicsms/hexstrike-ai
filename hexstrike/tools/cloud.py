@@ -46,3 +46,25 @@ def trivy_scan(target: str, scan_type: str = "image", output_format: str = "json
     if output_file:
         result["output_file"] = output_file
     return result
+
+@ToolRegistry.register(
+    name="scout_suite_scan",
+    category="cloud",
+    description="Multi-cloud security assessment using Scout Suite",
+    endpoint="/api/tools/scout-suite"
+)
+def scout_suite_scan(provider: str = "aws", profile: Optional[str] = "default", report_dir: str = "/tmp/scout-suite", services: Optional[str] = None, exceptions: Optional[str] = None, additional_args: Optional[str] = None) -> Dict[str, Any]:
+    Path(report_dir).mkdir(parents=True, exist_ok=True)
+    cmd = ["scout", provider]
+    if profile and provider == "aws":
+        cmd.extend(["--profile", profile])
+    if services:
+        cmd.extend(["--services", services])
+    if exceptions:
+        cmd.extend(["--exceptions", exceptions])
+    cmd.extend(["--report-dir", report_dir])
+    if additional_args:
+        cmd.extend(additional_args.split())
+    result = run_tool_command(cmd)
+    result["report_directory"] = report_dir
+    return result

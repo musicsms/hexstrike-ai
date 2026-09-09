@@ -64,3 +64,37 @@ def test_trivy_scan_handler_invocation(monkeypatch):
 
     res2 = tool.handler(target="myimage:latest")
     assert "output_file" not in res2
+
+
+def test_scout_suite_scan_handler_invocation_aws(monkeypatch, tmp_path):
+    captured = _mock_execute(monkeypatch)
+    tool = ToolRegistry.get("scout_suite_scan")
+    assert tool is not None
+    assert tool.endpoint == "/api/tools/scout-suite"
+
+    report_dir = str(tmp_path / "scout-report")
+    res = tool.handler(
+        provider="aws", profile="myprofile", report_dir=report_dir,
+        services="s3,ec2", exceptions="exc.json", additional_args="--no-browser",
+    )
+    assert res["success"] is True
+    assert captured["cmd"] == [
+        "scout", "aws",
+        "--profile", "myprofile",
+        "--services", "s3,ec2",
+        "--exceptions", "exc.json",
+        "--report-dir", report_dir,
+        "--no-browser",
+    ]
+    assert res["report_directory"] == report_dir
+    assert Path(report_dir).is_dir()
+
+
+def test_scout_suite_scan_handler_invocation_non_aws_skips_profile(monkeypatch, tmp_path):
+    captured = _mock_execute(monkeypatch)
+    tool = ToolRegistry.get("scout_suite_scan")
+
+    report_dir = str(tmp_path / "scout-report-azure")
+    res = tool.handler(provider="azure", profile="myprofile", report_dir=report_dir)
+    assert res["success"] is True
+    assert captured["cmd"] == ["scout", "azure", "--report-dir", report_dir]
