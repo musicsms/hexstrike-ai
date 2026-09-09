@@ -292,3 +292,18 @@ def test_zap_scan_handler_invocation_daemon(monkeypatch):
     res = tool.handler(daemon=True, host="127.0.0.1", port="9090", api_key="KEY123")
     assert res["success"] is True
     assert captured["cmd"] == ["zaproxy", "-daemon", "-host", "127.0.0.1", "-port", "9090", "-config", "api.key=KEY123"]
+
+
+def test_web_category_has_23_tools():
+    from hexstrike.core.registry import ToolRegistry
+    import hexstrike.tools
+    web_tools = ToolRegistry.get_by_category("web")
+    assert len(web_tools) == 23
+    names = {t.name for t in web_tools}
+    assert names == {
+        "ffuf_fuzz", "gobuster_dir", "sqlmap_scan",
+        "arjun_scan", "dalfox_scan", "dirb_scan", "dirsearch_scan", "dotdotpwn_scan",
+        "feroxbuster_scan", "gau_discover", "httpx_probe", "jaeles_scan", "katana_crawl",
+        "nikto_scan", "nuclei_scan", "paramspider_mine", "wafw00f_scan",
+        "waybackurls_discover", "wfuzz_scan", "wpscan_scan", "x8_scan", "xsser_scan", "zap_scan",
+    }
