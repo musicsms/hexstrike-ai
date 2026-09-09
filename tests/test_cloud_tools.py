@@ -98,3 +98,14 @@ def test_scout_suite_scan_handler_invocation_non_aws_skips_profile(monkeypatch, 
     res = tool.handler(provider="azure", profile="myprofile", report_dir=report_dir)
     assert res["success"] is True
     assert captured["cmd"] == ["scout", "azure", "--report-dir", report_dir]
+
+
+def test_cloudmapper_run_handler_invocation(monkeypatch):
+    captured = _mock_execute(monkeypatch)
+    tool = ToolRegistry.get("cloudmapper_run")
+    assert tool is not None
+    assert tool.endpoint == "/api/tools/cloudmapper"
+
+    res = tool.handler(action="collect", account="123456789", config="myconfig.json", additional_args="--verbose")
+    assert res["success"] is True
+    assert captured["cmd"] == ["cloudmapper", "collect", "--account", "123456789", "--config", "myconfig.json", "--verbose"]

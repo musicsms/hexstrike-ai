@@ -68,3 +68,19 @@ def scout_suite_scan(provider: str = "aws", profile: Optional[str] = "default", 
     result = run_tool_command(cmd)
     result["report_directory"] = report_dir
     return result
+
+@ToolRegistry.register(
+    name="cloudmapper_run",
+    category="cloud",
+    description="AWS network visualization and security analysis using CloudMapper",
+    endpoint="/api/tools/cloudmapper"
+)
+def cloudmapper_run(action: str = "collect", account: Optional[str] = None, config: Optional[str] = "config.json", additional_args: Optional[str] = None) -> Dict[str, Any]:
+    cmd = ["cloudmapper", action]
+    if account:
+        cmd.extend(["--account", account])
+    if config:
+        cmd.extend(["--config", config])
+    if additional_args:
+        cmd.extend(additional_args.split())
+    return run_tool_command(cmd)
