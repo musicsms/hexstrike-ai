@@ -180,3 +180,14 @@ def test_nikto_scan_handler_invocation(monkeypatch):
     res = tool.handler(target="http://x.com", additional_args="-Tuning 1")
     assert res["success"] is True
     assert captured["cmd"] == ["nikto", "-h", "http://x.com", "-Tuning", "1"]
+
+
+def test_nuclei_scan_handler_invocation(monkeypatch):
+    captured = _mock_execute(monkeypatch)
+    tool = ToolRegistry.get("nuclei_scan")
+    assert tool is not None
+    assert tool.endpoint == "/api/tools/nuclei"
+
+    res = tool.handler(target="http://x.com", severity="high", tags="cve", template="/tmp/t.yaml", additional_args="-rl 10")
+    assert res["success"] is True
+    assert captured["cmd"] == ["nuclei", "-u", "http://x.com", "-severity", "high", "-tags", "cve", "-t", "/tmp/t.yaml", "-rl", "10"]

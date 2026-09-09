@@ -219,3 +219,21 @@ def nikto_scan(target: str, additional_args: Optional[str] = None) -> Dict[str, 
     if additional_args:
         cmd.extend(additional_args.split())
     return run_tool_command(cmd)
+
+@ToolRegistry.register(
+    name="nuclei_scan",
+    category="web",
+    description="Vulnerability scanning using Nuclei templates",
+    endpoint="/api/tools/nuclei"
+)
+def nuclei_scan(target: str, severity: Optional[str] = None, tags: Optional[str] = None, template: Optional[str] = None, additional_args: Optional[str] = None) -> Dict[str, Any]:
+    cmd = ["nuclei", "-u", target]
+    if severity:
+        cmd.extend(["-severity", severity])
+    if tags:
+        cmd.extend(["-tags", tags])
+    if template:
+        cmd.extend(["-t", template])
+    if additional_args:
+        cmd.extend(additional_args.split())
+    return run_tool_command(cmd)
