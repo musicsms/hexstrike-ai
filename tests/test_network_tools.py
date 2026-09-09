@@ -231,3 +231,28 @@ def test_subfinder_enum_handler_invocation(monkeypatch):
     res = tool.handler(domain="example.com", silent=True, all_sources=True, additional_args="-timeout 30")
     assert res["success"] is True
     assert captured["cmd"] == ["subfinder", "-d", "example.com", "-silent", "-all", "-timeout", "30"]
+
+
+def test_nmap_advanced_scan_handler_default_scripts(monkeypatch):
+    captured = _mock_execute(monkeypatch)
+    tool = ToolRegistry.get("nmap_advanced_scan")
+    assert tool is not None
+    assert tool.endpoint == "/api/tools/nmap-advanced"
+
+    res = tool.handler(
+        target="10.0.0.5", ports="80,443", os_detection=True, version_detection=True, additional_args="--reason",
+    )
+    assert res["success"] is True
+    assert captured["cmd"] == [
+        "nmap", "-sS", "10.0.0.5", "-p", "80,443", "-T4", "-O", "-sV",
+        "--script=default,discovery,safe", "--reason",
+    ]
+
+
+def test_nmap_advanced_scan_handler_stealth_aggressive_custom_scripts(monkeypatch):
+    captured = _mock_execute(monkeypatch)
+    tool = ToolRegistry.get("nmap_advanced_scan")
+
+    res = tool.handler(target="10.0.0.5", stealth=True, aggressive=True, nse_scripts="vuln")
+    assert res["success"] is True
+    assert captured["cmd"] == ["nmap", "-sS", "10.0.0.5", "-T2", "-f", "--mtu", "24", "-A", "--script=vuln"]

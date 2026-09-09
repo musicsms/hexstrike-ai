@@ -267,3 +267,31 @@ def subfinder_enum(domain: str, silent: bool = True, all_sources: bool = False, 
     if additional_args:
         cmd.extend(additional_args.split())
     return run_tool_command(cmd)
+
+@ToolRegistry.register(
+    name="nmap_advanced_scan",
+    category="network",
+    description="Advanced Nmap scans with custom NSE scripts and optimized timing",
+    endpoint="/api/tools/nmap-advanced"
+)
+def nmap_advanced_scan(target: str, scan_type: str = "-sS", ports: Optional[str] = None, timing: str = "T4", nse_scripts: Optional[str] = None, os_detection: bool = False, version_detection: bool = False, aggressive: bool = False, stealth: bool = False, additional_args: Optional[str] = None) -> Dict[str, Any]:
+    cmd = ["nmap", scan_type, target]
+    if ports:
+        cmd.extend(["-p", ports])
+    if stealth:
+        cmd.extend(["-T2", "-f", "--mtu", "24"])
+    else:
+        cmd.append(f"-{timing}")
+    if os_detection:
+        cmd.append("-O")
+    if version_detection:
+        cmd.append("-sV")
+    if aggressive:
+        cmd.append("-A")
+    if nse_scripts:
+        cmd.append(f"--script={nse_scripts}")
+    elif not aggressive:
+        cmd.append("--script=default,discovery,safe")
+    if additional_args:
+        cmd.extend(additional_args.split())
+    return run_tool_command(cmd)
