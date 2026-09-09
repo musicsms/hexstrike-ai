@@ -169,3 +169,14 @@ def test_falco_scan_handler_invocation(monkeypatch):
     res = tool.handler(config_file="/tmp/falco.yaml", rules_file="/tmp/rules.yaml", output_format="json", duration=30, additional_args="-v")
     assert res["success"] is True
     assert captured["cmd"] == ["timeout", "30", "falco", "--config", "/tmp/falco.yaml", "--rules", "/tmp/rules.yaml", "--json", "-v"]
+
+
+def test_clair_scan_handler_invocation(monkeypatch):
+    captured = _mock_execute(monkeypatch)
+    tool = ToolRegistry.get("clair_scan")
+    assert tool is not None
+    assert tool.endpoint == "/api/tools/clair"
+
+    res = tool.handler(image="myimage:latest", config="/tmp/clair.yaml", output_format="json", additional_args="-v")
+    assert res["success"] is True
+    assert captured["cmd"] == ["clairctl", "analyze", "myimage:latest", "--config", "/tmp/clair.yaml", "--format", "json", "-v"]

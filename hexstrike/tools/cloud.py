@@ -168,3 +168,19 @@ def falco_scan(config_file: str = "/etc/falco/falco.yaml", rules_file: Optional[
     if additional_args:
         cmd.extend(additional_args.split())
     return run_tool_command(cmd)
+
+@ToolRegistry.register(
+    name="clair_scan",
+    category="cloud",
+    description="Container vulnerability analysis using Clair",
+    endpoint="/api/tools/clair"
+)
+def clair_scan(image: str, config: str = "/etc/clair/config.yaml", output_format: str = "json", additional_args: Optional[str] = None) -> Dict[str, Any]:
+    cmd = ["clairctl", "analyze", image]
+    if config:
+        cmd.extend(["--config", config])
+    if output_format:
+        cmd.extend(["--format", output_format])
+    if additional_args:
+        cmd.extend(additional_args.split())
+    return run_tool_command(cmd)
