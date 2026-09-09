@@ -119,3 +119,15 @@ def dotdotpwn_scan(target: str, module: str = "http", additional_args: Optional[
         cmd.extend(additional_args.split())
     cmd.append("-b")
     return run_tool_command(cmd)
+
+@ToolRegistry.register(
+    name="feroxbuster_scan",
+    category="web",
+    description="Recursive content discovery using Feroxbuster",
+    endpoint="/api/tools/feroxbuster"
+)
+def feroxbuster_scan(url: str, wordlist: str = "/usr/share/wordlists/dirb/common.txt", threads: int = 10, additional_args: Optional[str] = None) -> Dict[str, Any]:
+    cmd = ["feroxbuster", "-u", url, "-w", wordlist, "-t", str(threads)]
+    if additional_args:
+        cmd.extend(additional_args.split())
+    return run_tool_command(cmd)

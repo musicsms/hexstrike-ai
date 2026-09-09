@@ -92,3 +92,14 @@ def test_dotdotpwn_scan_handler_invocation(monkeypatch):
     res = tool.handler(target="10.0.0.1", module="ftp", additional_args="-t 300")
     assert res["success"] is True
     assert captured["cmd"] == ["dotdotpwn", "-m", "ftp", "-h", "10.0.0.1", "-t", "300", "-b"]
+
+
+def test_feroxbuster_scan_handler_invocation(monkeypatch):
+    captured = _mock_execute(monkeypatch)
+    tool = ToolRegistry.get("feroxbuster_scan")
+    assert tool is not None
+    assert tool.endpoint == "/api/tools/feroxbuster"
+
+    res = tool.handler(url="http://x.com", wordlist="/tmp/wl.txt", threads=20, additional_args="-A")
+    assert res["success"] is True
+    assert captured["cmd"] == ["feroxbuster", "-u", "http://x.com", "-w", "/tmp/wl.txt", "-t", "20", "-A"]
