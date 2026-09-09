@@ -198,3 +198,20 @@ def test_checkov_scan_handler_invocation(monkeypatch):
         "--framework", "terraform", "--check", "CKV_AWS_1", "--skip-check", "CKV_AWS_2",
         "--output", "json", "--compact",
     ]
+
+
+def test_terrascan_scan_handler_invocation(monkeypatch):
+    captured = _mock_execute(monkeypatch)
+    tool = ToolRegistry.get("terrascan_scan")
+    assert tool is not None
+    assert tool.endpoint == "/api/tools/terrascan"
+
+    res = tool.handler(
+        scan_type="terraform", iac_dir="/tmp/iac", policy_type="aws",
+        output_format="json", severity="HIGH", additional_args="--non-recursive",
+    )
+    assert res["success"] is True
+    assert captured["cmd"] == [
+        "terrascan", "scan", "-t", "terraform", "-d", "/tmp/iac",
+        "-p", "aws", "-o", "json", "--severity", "HIGH", "--non-recursive",
+    ]

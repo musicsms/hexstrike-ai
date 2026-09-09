@@ -204,3 +204,21 @@ def checkov_scan(directory: str = ".", framework: Optional[str] = None, check: O
     if additional_args:
         cmd.extend(additional_args.split())
     return run_tool_command(cmd)
+
+@ToolRegistry.register(
+    name="terrascan_scan",
+    category="cloud",
+    description="Infrastructure as code security scanning using Terrascan",
+    endpoint="/api/tools/terrascan"
+)
+def terrascan_scan(scan_type: str = "all", iac_dir: str = ".", policy_type: Optional[str] = None, output_format: str = "json", severity: Optional[str] = None, additional_args: Optional[str] = None) -> Dict[str, Any]:
+    cmd = ["terrascan", "scan", "-t", scan_type, "-d", iac_dir]
+    if policy_type:
+        cmd.extend(["-p", policy_type])
+    if output_format:
+        cmd.extend(["-o", output_format])
+    if severity:
+        cmd.extend(["--severity", severity])
+    if additional_args:
+        cmd.extend(additional_args.split())
+    return run_tool_command(cmd)
