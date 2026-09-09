@@ -191,3 +191,14 @@ def test_nuclei_scan_handler_invocation(monkeypatch):
     res = tool.handler(target="http://x.com", severity="high", tags="cve", template="/tmp/t.yaml", additional_args="-rl 10")
     assert res["success"] is True
     assert captured["cmd"] == ["nuclei", "-u", "http://x.com", "-severity", "high", "-tags", "cve", "-t", "/tmp/t.yaml", "-rl", "10"]
+
+
+def test_paramspider_mine_handler_invocation(monkeypatch):
+    captured = _mock_execute(monkeypatch)
+    tool = ToolRegistry.get("paramspider_mine")
+    assert tool is not None
+    assert tool.endpoint == "/api/tools/paramspider"
+
+    res = tool.handler(domain="example.com", level=3, exclude="png,jpg", output="/tmp/out.txt", additional_args="-q")
+    assert res["success"] is True
+    assert captured["cmd"] == ["paramspider", "-d", "example.com", "-l", "3", "--exclude", "png,jpg", "-o", "/tmp/out.txt", "-q"]

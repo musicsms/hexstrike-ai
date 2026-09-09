@@ -237,3 +237,19 @@ def nuclei_scan(target: str, severity: Optional[str] = None, tags: Optional[str]
     if additional_args:
         cmd.extend(additional_args.split())
     return run_tool_command(cmd)
+
+@ToolRegistry.register(
+    name="paramspider_mine",
+    category="web",
+    description="Parameter mining from web archives using ParamSpider",
+    endpoint="/api/tools/paramspider"
+)
+def paramspider_mine(domain: str, level: int = 2, exclude: str = "png,jpg,gif,jpeg,swf,woff,svg,pdf,css,ico", output: Optional[str] = None, additional_args: Optional[str] = None) -> Dict[str, Any]:
+    cmd = ["paramspider", "-d", domain, "-l", str(level)]
+    if exclude:
+        cmd.extend(["--exclude", exclude])
+    if output:
+        cmd.extend(["-o", output])
+    if additional_args:
+        cmd.extend(additional_args.split())
+    return run_tool_command(cmd)
