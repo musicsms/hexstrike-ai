@@ -84,3 +84,29 @@ def cloudmapper_run(action: str = "collect", account: Optional[str] = None, conf
     if additional_args:
         cmd.extend(additional_args.split())
     return run_tool_command(cmd)
+
+@ToolRegistry.register(
+    name="kube_hunter_scan",
+    category="cloud",
+    description="Kubernetes penetration testing using kube-hunter",
+    endpoint="/api/tools/kube-hunter"
+)
+def kube_hunter_scan(target: Optional[str] = None, remote: Optional[str] = None, cidr: Optional[str] = None, interface: Optional[str] = None, active: bool = False, report: str = "json", additional_args: Optional[str] = None) -> Dict[str, Any]:
+    cmd = ["kube-hunter"]
+    if target:
+        cmd.extend(["--remote", target])
+    elif remote:
+        cmd.extend(["--remote", remote])
+    elif cidr:
+        cmd.extend(["--cidr", cidr])
+    elif interface:
+        cmd.extend(["--interface", interface])
+    else:
+        cmd.append("--pod")
+    if active:
+        cmd.append("--active")
+    if report:
+        cmd.extend(["--report", report])
+    if additional_args:
+        cmd.extend(additional_args.split())
+    return run_tool_command(cmd)

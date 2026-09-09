@@ -109,3 +109,23 @@ def test_cloudmapper_run_handler_invocation(monkeypatch):
     res = tool.handler(action="collect", account="123456789", config="myconfig.json", additional_args="--verbose")
     assert res["success"] is True
     assert captured["cmd"] == ["cloudmapper", "collect", "--account", "123456789", "--config", "myconfig.json", "--verbose"]
+
+
+def test_kube_hunter_scan_handler_invocation_target(monkeypatch):
+    captured = _mock_execute(monkeypatch)
+    tool = ToolRegistry.get("kube_hunter_scan")
+    assert tool is not None
+    assert tool.endpoint == "/api/tools/kube-hunter"
+
+    res = tool.handler(target="10.0.0.1", active=True, report="json", additional_args="-v")
+    assert res["success"] is True
+    assert captured["cmd"] == ["kube-hunter", "--remote", "10.0.0.1", "--active", "--report", "json", "-v"]
+
+
+def test_kube_hunter_scan_handler_invocation_default_pod(monkeypatch):
+    captured = _mock_execute(monkeypatch)
+    tool = ToolRegistry.get("kube_hunter_scan")
+
+    res = tool.handler(report="json")
+    assert res["success"] is True
+    assert captured["cmd"] == ["kube-hunter", "--pod", "--report", "json"]
