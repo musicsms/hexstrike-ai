@@ -256,3 +256,17 @@ def test_nmap_advanced_scan_handler_stealth_aggressive_custom_scripts(monkeypatc
     res = tool.handler(target="10.0.0.5", stealth=True, aggressive=True, nse_scripts="vuln")
     assert res["success"] is True
     assert captured["cmd"] == ["nmap", "-sS", "10.0.0.5", "-T2", "-f", "--mtu", "24", "-A", "--script=vuln"]
+
+
+def test_network_category_has_16_tools():
+    from hexstrike.core.registry import ToolRegistry
+    import hexstrike.tools
+    network_tools = ToolRegistry.get_by_category("network")
+    assert len(network_tools) == 16
+    names = {t.name for t in network_tools}
+    assert names == {
+        "nmap_scan", "rustscan_scan", "masscan_scan", "arp_scan", "autorecon_scan",
+        "dnsenum_scan", "enum4linux_scan", "enum4linux_ng_scan", "fierce_scan",
+        "nbtscan_scan", "netexec_scan", "responder_capture", "rpcclient_enum",
+        "smbmap_scan", "subfinder_enum", "nmap_advanced_scan",
+    }
