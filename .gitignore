@@ -1,0 +1,7 @@
+__pycache__/
+*.py[cod]
+*$py.class
+hexstrike-dev/
+hexstrike_env/
+.pytest_cache/
+*.log
