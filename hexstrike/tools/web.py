@@ -281,3 +281,15 @@ def waybackurls_discover(domain: str, get_versions: bool = False, no_subs: bool 
     if additional_args:
         cmd.extend(additional_args.split())
     return run_tool_command(cmd)
+
+@ToolRegistry.register(
+    name="wfuzz_scan",
+    category="web",
+    description="Web application fuzzing using Wfuzz",
+    endpoint="/api/tools/wfuzz"
+)
+def wfuzz_scan(url: str, wordlist: str = "/usr/share/wordlists/dirb/common.txt", additional_args: Optional[str] = None) -> Dict[str, Any]:
+    cmd = ["wfuzz", "-w", wordlist, url]
+    if additional_args:
+        cmd.extend(additional_args.split())
+    return run_tool_command(cmd)

@@ -224,3 +224,14 @@ def test_waybackurls_discover_handler_invocation(monkeypatch):
     res = tool.handler(domain="example.com", get_versions=True, no_subs=True, additional_args="-d")
     assert res["success"] is True
     assert captured["cmd"] == ["waybackurls", "example.com", "--get-versions", "--no-subs", "-d"]
+
+
+def test_wfuzz_scan_handler_invocation(monkeypatch):
+    captured = _mock_execute(monkeypatch)
+    tool = ToolRegistry.get("wfuzz_scan")
+    assert tool is not None
+    assert tool.endpoint == "/api/tools/wfuzz"
+
+    res = tool.handler(url="http://x.com/FUZZ", wordlist="/tmp/wl.txt", additional_args="-c")
+    assert res["success"] is True
+    assert captured["cmd"] == ["wfuzz", "-w", "/tmp/wl.txt", "http://x.com/FUZZ", "-c"]
