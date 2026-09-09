@@ -27,7 +27,7 @@ def setup_mcp_server(client: HexStrikeClient) -> FastMCP:
             return tool_func
 
         wrapped = make_tool(handler, endpoint)
-        mcp.tool()(wrapped)
+        mcp.tool(name=tool_name, description=tool_desc)(wrapped)
 
     return mcp
 
