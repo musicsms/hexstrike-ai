@@ -129,3 +129,17 @@ def test_kube_hunter_scan_handler_invocation_default_pod(monkeypatch):
     res = tool.handler(report="json")
     assert res["success"] is True
     assert captured["cmd"] == ["kube-hunter", "--pod", "--report", "json"]
+
+
+def test_kube_bench_scan_handler_invocation(monkeypatch):
+    captured = _mock_execute(monkeypatch)
+    tool = ToolRegistry.get("kube_bench_scan")
+    assert tool is not None
+    assert tool.endpoint == "/api/tools/kube-bench"
+
+    res = tool.handler(targets="master,node", version="1.23", config_dir="/etc/kube-bench", output_format="json", additional_args="-v")
+    assert res["success"] is True
+    assert captured["cmd"] == [
+        "kube-bench", "--targets", "master,node", "--version", "1.23", "--config-dir", "/etc/kube-bench",
+        "--outputfile", "/tmp/kube-bench-results.json", "--json", "-v",
+    ]

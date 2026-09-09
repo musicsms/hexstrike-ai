@@ -110,3 +110,23 @@ def kube_hunter_scan(target: Optional[str] = None, remote: Optional[str] = None,
     if additional_args:
         cmd.extend(additional_args.split())
     return run_tool_command(cmd)
+
+@ToolRegistry.register(
+    name="kube_bench_scan",
+    category="cloud",
+    description="CIS Kubernetes benchmark checks using kube-bench",
+    endpoint="/api/tools/kube-bench"
+)
+def kube_bench_scan(targets: Optional[str] = None, version: Optional[str] = None, config_dir: Optional[str] = None, output_format: str = "json", additional_args: Optional[str] = None) -> Dict[str, Any]:
+    cmd = ["kube-bench"]
+    if targets:
+        cmd.extend(["--targets", targets])
+    if version:
+        cmd.extend(["--version", version])
+    if config_dir:
+        cmd.extend(["--config-dir", config_dir])
+    if output_format:
+        cmd.extend(["--outputfile", f"/tmp/kube-bench-results.{output_format}", "--json"])
+    if additional_args:
+        cmd.extend(additional_args.split())
+    return run_tool_command(cmd)
