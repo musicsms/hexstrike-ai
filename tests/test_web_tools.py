@@ -213,3 +213,14 @@ def test_wafw00f_scan_handler_invocation(monkeypatch):
     res = tool.handler(target="http://x.com", additional_args="-a")
     assert res["success"] is True
     assert captured["cmd"] == ["wafw00f", "http://x.com", "-a"]
+
+
+def test_waybackurls_discover_handler_invocation(monkeypatch):
+    captured = _mock_execute(monkeypatch)
+    tool = ToolRegistry.get("waybackurls_discover")
+    assert tool is not None
+    assert tool.endpoint == "/api/tools/waybackurls"
+
+    res = tool.handler(domain="example.com", get_versions=True, no_subs=True, additional_args="-d")
+    assert res["success"] is True
+    assert captured["cmd"] == ["waybackurls", "example.com", "--get-versions", "--no-subs", "-d"]

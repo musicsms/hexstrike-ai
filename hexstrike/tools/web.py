@@ -265,3 +265,19 @@ def wafw00f_scan(target: str, additional_args: Optional[str] = None) -> Dict[str
     if additional_args:
         cmd.extend(additional_args.split())
     return run_tool_command(cmd)
+
+@ToolRegistry.register(
+    name="waybackurls_discover",
+    category="web",
+    description="Historical URL discovery using Waybackurls",
+    endpoint="/api/tools/waybackurls"
+)
+def waybackurls_discover(domain: str, get_versions: bool = False, no_subs: bool = False, additional_args: Optional[str] = None) -> Dict[str, Any]:
+    cmd = ["waybackurls", domain]
+    if get_versions:
+        cmd.append("--get-versions")
+    if no_subs:
+        cmd.append("--no-subs")
+    if additional_args:
+        cmd.extend(additional_args.split())
+    return run_tool_command(cmd)
