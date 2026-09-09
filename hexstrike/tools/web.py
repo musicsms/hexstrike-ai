@@ -92,3 +92,17 @@ def dirb_scan(url: str, wordlist: str = "/usr/share/wordlists/dirb/common.txt", 
     if additional_args:
         cmd.extend(additional_args.split())
     return run_tool_command(cmd)
+
+@ToolRegistry.register(
+    name="dirsearch_scan",
+    category="web",
+    description="Advanced directory and file discovery using Dirsearch",
+    endpoint="/api/tools/dirsearch"
+)
+def dirsearch_scan(url: str, extensions: str = "php,html,js,txt,xml,json", wordlist: str = "/usr/share/wordlists/dirsearch/common.txt", threads: int = 30, recursive: bool = False, additional_args: Optional[str] = None) -> Dict[str, Any]:
+    cmd = ["dirsearch", "-u", url, "-e", extensions, "-w", wordlist, "-t", str(threads)]
+    if recursive:
+        cmd.append("-r")
+    if additional_args:
+        cmd.extend(additional_args.split())
+    return run_tool_command(cmd)

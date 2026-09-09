@@ -70,3 +70,14 @@ def test_dirb_scan_handler_invocation(monkeypatch):
     res = tool.handler(url="http://x.com", additional_args="-S")
     assert res["success"] is True
     assert captured["cmd"] == ["dirb", "http://x.com", "/usr/share/wordlists/dirb/common.txt", "-S"]
+
+
+def test_dirsearch_scan_handler_invocation(monkeypatch):
+    captured = _mock_execute(monkeypatch)
+    tool = ToolRegistry.get("dirsearch_scan")
+    assert tool is not None
+    assert tool.endpoint == "/api/tools/dirsearch"
+
+    res = tool.handler(url="http://x.com", extensions="php", wordlist="/tmp/wl.txt", threads=5, recursive=True, additional_args="-f")
+    assert res["success"] is True
+    assert captured["cmd"] == ["dirsearch", "-u", "http://x.com", "-e", "php", "-w", "/tmp/wl.txt", "-t", "5", "-r", "-f"]
