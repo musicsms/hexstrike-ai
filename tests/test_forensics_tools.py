@@ -39,3 +39,17 @@ def test_exiftool_scan_handler_invocation(monkeypatch):
     res = tool.handler(file_path="/tmp/img.jpg", output_format="json", tags="GPS", additional_args="-v")
     assert res["success"] is True
     assert captured["cmd"] == ["exiftool", "-json", "-GPS", "-v", "/tmp/img.jpg"]
+
+
+def test_foremost_scan_handler_invocation(monkeypatch, tmp_path):
+    captured = _mock_execute(monkeypatch)
+    tool = ToolRegistry.get("foremost_scan")
+    assert tool is not None
+    assert tool.endpoint == "/api/tools/foremost"
+
+    output_dir = str(tmp_path / "foremost_output")
+    res = tool.handler(input_file="/tmp/disk.img", output_dir=output_dir, file_types="jpg,png", additional_args="-v")
+    assert res["success"] is True
+    assert captured["cmd"] == ["foremost", "-o", output_dir, "-t", "jpg,png", "-v", "/tmp/disk.img"]
+    assert res["output_directory"] == output_dir
+    assert Path(output_dir).is_dir()
