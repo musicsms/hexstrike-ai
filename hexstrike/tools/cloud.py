@@ -130,3 +130,23 @@ def kube_bench_scan(targets: Optional[str] = None, version: Optional[str] = None
     if additional_args:
         cmd.extend(additional_args.split())
     return run_tool_command(cmd)
+
+@ToolRegistry.register(
+    name="docker_bench_security_scan",
+    category="cloud",
+    description="Docker security assessment using Docker Bench for Security",
+    endpoint="/api/tools/docker-bench-security"
+)
+def docker_bench_security_scan(checks: Optional[str] = None, exclude: Optional[str] = None, output_file: str = "/tmp/docker-bench-results.json", additional_args: Optional[str] = None) -> Dict[str, Any]:
+    cmd = ["docker-bench-security"]
+    if checks:
+        cmd.extend(["-c", checks])
+    if exclude:
+        cmd.extend(["-e", exclude])
+    if output_file:
+        cmd.extend(["-l", output_file])
+    if additional_args:
+        cmd.extend(additional_args.split())
+    result = run_tool_command(cmd)
+    result["output_file"] = output_file
+    return result

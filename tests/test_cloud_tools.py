@@ -143,3 +143,18 @@ def test_kube_bench_scan_handler_invocation(monkeypatch):
         "kube-bench", "--targets", "master,node", "--version", "1.23", "--config-dir", "/etc/kube-bench",
         "--outputfile", "/tmp/kube-bench-results.json", "--json", "-v",
     ]
+
+
+def test_docker_bench_security_scan_handler_invocation(monkeypatch):
+    captured = _mock_execute(monkeypatch)
+    tool = ToolRegistry.get("docker_bench_security_scan")
+    assert tool is not None
+    assert tool.endpoint == "/api/tools/docker-bench-security"
+
+    res = tool.handler(checks="check1", exclude="check2", output_file="/tmp/custom.json", additional_args="-v")
+    assert res["success"] is True
+    assert captured["cmd"] == ["docker-bench-security", "-c", "check1", "-e", "check2", "-l", "/tmp/custom.json", "-v"]
+    assert res["output_file"] == "/tmp/custom.json"
+
+    res2 = tool.handler()
+    assert res2["output_file"] == "/tmp/docker-bench-results.json"
