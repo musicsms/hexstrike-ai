@@ -53,3 +53,32 @@ def test_foremost_scan_handler_invocation(monkeypatch, tmp_path):
     assert captured["cmd"] == ["foremost", "-o", output_dir, "-t", "jpg,png", "-v", "/tmp/disk.img"]
     assert res["output_directory"] == output_dir
     assert Path(output_dir).is_dir()
+
+
+def test_steghide_run_handler_invocation_extract(monkeypatch):
+    captured = _mock_execute(monkeypatch)
+    tool = ToolRegistry.get("steghide_run")
+    assert tool is not None
+    assert tool.endpoint == "/api/tools/steghide"
+
+    res = tool.handler(cover_file="/tmp/img.jpg", action="extract", output_file="/tmp/out.txt", passphrase="secret", additional_args="-v")
+    assert res["success"] is True
+    assert captured["cmd"] == ["steghide", "extract", "-sf", "/tmp/img.jpg", "-xf", "/tmp/out.txt", "-p", "secret", "-v"]
+
+
+def test_steghide_run_handler_invocation_embed_no_passphrase(monkeypatch):
+    captured = _mock_execute(monkeypatch)
+    tool = ToolRegistry.get("steghide_run")
+
+    res = tool.handler(cover_file="/tmp/img.jpg", action="embed", embed_file="/tmp/secret.txt")
+    assert res["success"] is True
+    assert captured["cmd"] == ["steghide", "embed", "-cf", "/tmp/img.jpg", "-ef", "/tmp/secret.txt", "-p", ""]
+
+
+def test_steghide_run_handler_invocation_info(monkeypatch):
+    captured = _mock_execute(monkeypatch)
+    tool = ToolRegistry.get("steghide_run")
+
+    res = tool.handler(cover_file="/tmp/img.jpg", action="info", passphrase="pw")
+    assert res["success"] is True
+    assert captured["cmd"] == ["steghide", "info", "/tmp/img.jpg", "-p", "pw"]

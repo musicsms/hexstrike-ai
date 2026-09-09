@@ -52,3 +52,26 @@ def foremost_scan(input_file: str, output_dir: str = "/tmp/foremost_output", fil
     result = run_tool_command(cmd)
     result["output_directory"] = output_dir
     return result
+
+@ToolRegistry.register(
+    name="steghide_run",
+    category="forensics",
+    description="Steganography analysis using Steghide",
+    endpoint="/api/tools/steghide"
+)
+def steghide_run(cover_file: str, action: str = "extract", embed_file: Optional[str] = None, passphrase: Optional[str] = None, output_file: Optional[str] = None, additional_args: Optional[str] = None) -> Dict[str, Any]:
+    if action == "extract":
+        cmd = ["steghide", "extract", "-sf", cover_file]
+        if output_file:
+            cmd.extend(["-xf", output_file])
+    elif action == "embed":
+        cmd = ["steghide", "embed", "-cf", cover_file, "-ef", embed_file]
+    elif action == "info":
+        cmd = ["steghide", "info", cover_file]
+    if passphrase:
+        cmd.extend(["-p", passphrase])
+    else:
+        cmd.extend(["-p", ""])
+    if additional_args:
+        cmd.extend(additional_args.split())
+    return run_tool_command(cmd)
