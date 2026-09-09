@@ -59,3 +59,14 @@ def test_dalfox_scan_handler_invocation_pipe_mode(monkeypatch):
     res = tool.handler(pipe_mode=True, mining_dom=False, mining_dict=False)
     assert res["success"] is True
     assert captured["cmd"] == ["dalfox", "pipe"]
+
+
+def test_dirb_scan_handler_invocation(monkeypatch):
+    captured = _mock_execute(monkeypatch)
+    tool = ToolRegistry.get("dirb_scan")
+    assert tool is not None
+    assert tool.endpoint == "/api/tools/dirb"
+
+    res = tool.handler(url="http://x.com", additional_args="-S")
+    assert res["success"] is True
+    assert captured["cmd"] == ["dirb", "http://x.com", "/usr/share/wordlists/dirb/common.txt", "-S"]

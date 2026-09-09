@@ -80,3 +80,15 @@ def dalfox_scan(url: Optional[str] = None, pipe_mode: bool = False, blind: bool 
     if additional_args:
         cmd.extend(additional_args.split())
     return run_tool_command(cmd)
+
+@ToolRegistry.register(
+    name="dirb_scan",
+    category="web",
+    description="Directory and file brute-forcing using dirb",
+    endpoint="/api/tools/dirb"
+)
+def dirb_scan(url: str, wordlist: str = "/usr/share/wordlists/dirb/common.txt", additional_args: Optional[str] = None) -> Dict[str, Any]:
+    cmd = ["dirb", url, wordlist]
+    if additional_args:
+        cmd.extend(additional_args.split())
+    return run_tool_command(cmd)
