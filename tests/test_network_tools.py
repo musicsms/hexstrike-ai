@@ -149,3 +149,21 @@ def test_nbtscan_scan_handler_invocation(monkeypatch):
     res = tool.handler(target="192.168.1.0/24", verbose=True, timeout=5, additional_args="-r")
     assert res["success"] is True
     assert captured["cmd"] == ["nbtscan", "-t", "5", "-v", "192.168.1.0/24", "-r"]
+
+
+def test_netexec_scan_handler_invocation(monkeypatch):
+    captured = _mock_execute(monkeypatch)
+    tool = ToolRegistry.get("netexec_scan")
+    assert tool is not None
+    assert tool.endpoint == "/api/tools/netexec"
+
+    res = tool.handler(
+        target="10.0.0.5", protocol="smb", username="admin", password="pass",
+        hash="aad3b435b51404eeaad3b435b51404ee", module="mimikatz", additional_args="--local-auth",
+    )
+    assert res["success"] is True
+    assert captured["cmd"] == [
+        "nxc", "smb", "10.0.0.5",
+        "-u", "admin", "-p", "pass", "-H", "aad3b435b51404eeaad3b435b51404ee", "-M", "mimikatz",
+        "--local-auth",
+    ]

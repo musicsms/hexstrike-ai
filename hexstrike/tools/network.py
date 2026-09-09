@@ -172,3 +172,23 @@ def nbtscan_scan(target: str, verbose: bool = False, timeout: int = 2, additiona
     if additional_args:
         cmd.extend(additional_args.split())
     return run_tool_command(cmd)
+
+@ToolRegistry.register(
+    name="netexec_scan",
+    category="network",
+    description="Network service exploitation using NetExec (formerly CrackMapExec)",
+    endpoint="/api/tools/netexec"
+)
+def netexec_scan(target: str, protocol: str = "smb", username: Optional[str] = None, password: Optional[str] = None, hash: Optional[str] = None, module: Optional[str] = None, additional_args: Optional[str] = None) -> Dict[str, Any]:
+    cmd = ["nxc", protocol, target]
+    if username:
+        cmd.extend(["-u", username])
+    if password:
+        cmd.extend(["-p", password])
+    if hash:
+        cmd.extend(["-H", hash])
+    if module:
+        cmd.extend(["-M", module])
+    if additional_args:
+        cmd.extend(additional_args.split())
+    return run_tool_command(cmd)
