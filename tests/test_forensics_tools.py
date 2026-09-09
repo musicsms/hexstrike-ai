@@ -28,3 +28,14 @@ def test_binwalk_scan_handler_invocation(monkeypatch):
     res = tool.handler(file_path="/tmp/fw.bin", extract=True, additional_args="-v")
     assert res["success"] is True
     assert captured["cmd"] == ["binwalk", "-e", "-v", "/tmp/fw.bin"]
+
+
+def test_exiftool_scan_handler_invocation(monkeypatch):
+    captured = _mock_execute(monkeypatch)
+    tool = ToolRegistry.get("exiftool_scan")
+    assert tool is not None
+    assert tool.endpoint == "/api/tools/exiftool"
+
+    res = tool.handler(file_path="/tmp/img.jpg", output_format="json", tags="GPS", additional_args="-v")
+    assert res["success"] is True
+    assert captured["cmd"] == ["exiftool", "-json", "-GPS", "-v", "/tmp/img.jpg"]
