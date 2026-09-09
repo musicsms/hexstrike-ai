@@ -106,3 +106,16 @@ def dirsearch_scan(url: str, extensions: str = "php,html,js,txt,xml,json", wordl
     if additional_args:
         cmd.extend(additional_args.split())
     return run_tool_command(cmd)
+
+@ToolRegistry.register(
+    name="dotdotpwn_scan",
+    category="web",
+    description="Directory traversal fuzzing using DotDotPwn",
+    endpoint="/api/tools/dotdotpwn"
+)
+def dotdotpwn_scan(target: str, module: str = "http", additional_args: Optional[str] = None) -> Dict[str, Any]:
+    cmd = ["dotdotpwn", "-m", module, "-h", target]
+    if additional_args:
+        cmd.extend(additional_args.split())
+    cmd.append("-b")
+    return run_tool_command(cmd)

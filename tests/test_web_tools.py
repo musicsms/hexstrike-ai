@@ -81,3 +81,14 @@ def test_dirsearch_scan_handler_invocation(monkeypatch):
     res = tool.handler(url="http://x.com", extensions="php", wordlist="/tmp/wl.txt", threads=5, recursive=True, additional_args="-f")
     assert res["success"] is True
     assert captured["cmd"] == ["dirsearch", "-u", "http://x.com", "-e", "php", "-w", "/tmp/wl.txt", "-t", "5", "-r", "-f"]
+
+
+def test_dotdotpwn_scan_handler_invocation(monkeypatch):
+    captured = _mock_execute(monkeypatch)
+    tool = ToolRegistry.get("dotdotpwn_scan")
+    assert tool is not None
+    assert tool.endpoint == "/api/tools/dotdotpwn"
+
+    res = tool.handler(target="10.0.0.1", module="ftp", additional_args="-t 300")
+    assert res["success"] is True
+    assert captured["cmd"] == ["dotdotpwn", "-m", "ftp", "-h", "10.0.0.1", "-t", "300", "-b"]
