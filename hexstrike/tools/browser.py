@@ -4,6 +4,7 @@ from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
 import json
 import requests
+from urllib.parse import urljoin
 from hexstrike.core.registry import ToolRegistry
 
 
@@ -272,6 +273,37 @@ class BrowserAgent:
         if page_info.get('console_errors'):
             modules.append('console_log_capture')
         return {'issues': issues, 'modules': modules}
+
+    def run_active_tests(self, page_info: dict, payload: str = '<hexstrikeXSSTest123>') -> dict:
+        findings = []
+        tested = 0
+        for form in page_info.get('forms', []):
+            if form.get('method', 'GET').upper() != 'GET':
+                continue
+            params = []
+            for inp in form.get('inputs', [])[:3]:
+                if inp.get('type', 'text') in ('text', 'search'):
+                    params.append(f"{inp.get('name', 'param')}={payload}")
+            if not params:
+                continue
+            action = form.get('action') or page_info.get('url', '')
+            if action.startswith('/'):
+                base = page_info.get('url', '')
+                try:
+                    action = urljoin(base, action)
+                except Exception:
+                    pass
+            test_url = action + ('&' if '?' in action else '?') + '&'.join(params)
+            try:
+                r = requests.get(test_url, timeout=8, verify=False)
+                tested += 1
+                if payload in r.text:
+                    findings.append({'type': 'reflected_xss', 'severity': 'high', 'description': 'Payload reflected in response', 'url': test_url})
+            except Exception:
+                continue
+            if tested >= 5:
+                break
+        return {'active_findings': findings, 'tested_forms': tested}
 
 
 _browser_agent = BrowserAgent()

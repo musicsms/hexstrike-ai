@@ -393,3 +393,51 @@ def test_extended_passive_analysis_aggregates_modules(monkeypatch):
     result = _browser_agent._extended_passive_analysis(page_info, "<html></html>")
     assert set(result["modules"]) == {"cookie_analysis", "security_headers", "mixed_content", "console_log_capture"}
     assert len(result["issues"]) > 0
+
+
+def test_run_active_tests_detects_reflection(monkeypatch):
+    class _FakeResponse:
+        text = "Result: <hexstrikeXSSTest123>"
+
+    monkeypatch.setattr("hexstrike.tools.browser.requests.get", lambda url, timeout=None, verify=None: _FakeResponse())
+
+    page_info = {
+        "url": "http://example.com/search",
+        "forms": [{"action": "/search", "method": "GET", "inputs": [{"name": "q", "type": "text", "value": ""}]}],
+    }
+    result = _browser_agent.run_active_tests(page_info)
+    assert result["tested_forms"] == 1
+    assert len(result["active_findings"]) == 1
+    assert result["active_findings"][0]["type"] == "reflected_xss"
+
+
+def test_run_active_tests_skips_post_forms(monkeypatch):
+    calls = []
+    monkeypatch.setattr("hexstrike.tools.browser.requests.get", lambda url, timeout=None, verify=None: calls.append(url))
+
+    page_info = {"url": "http://example.com", "forms": [{"action": "/x", "method": "POST", "inputs": [{"name": "q", "type": "text"}]}]}
+    result = _browser_agent.run_active_tests(page_info)
+    assert result == {"active_findings": [], "tested_forms": 0}
+    assert calls == []
+
+
+def test_run_active_tests_skips_forms_with_no_text_inputs(monkeypatch):
+    calls = []
+    monkeypatch.setattr("hexstrike.tools.browser.requests.get", lambda url, timeout=None, verify=None: calls.append(url))
+
+    page_info = {"url": "http://example.com", "forms": [{"action": "/x", "method": "GET", "inputs": [{"name": "cb", "type": "checkbox"}]}]}
+    result = _browser_agent.run_active_tests(page_info)
+    assert result["tested_forms"] == 0
+    assert calls == []
+
+
+def test_run_active_tests_no_reflection_no_finding(monkeypatch):
+    class _FakeResponse:
+        text = "no reflection here"
+
+    monkeypatch.setattr("hexstrike.tools.browser.requests.get", lambda url, timeout=None, verify=None: _FakeResponse())
+
+    page_info = {"url": "http://example.com", "forms": [{"action": "/search", "method": "GET", "inputs": [{"name": "q", "type": "text"}]}]}
+    result = _browser_agent.run_active_tests(page_info)
+    assert result["active_findings"] == []
+    assert result["tested_forms"] == 1
