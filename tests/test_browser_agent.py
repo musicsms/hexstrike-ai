@@ -542,7 +542,7 @@ def test_browser_navigate_handler_invocation_setup_failure(monkeypatch):
 
     tool = ToolRegistry.get("browser_navigate")
     res = tool.handler(url="http://example.com")
-    assert res == {"error": "Failed to setup browser"}
+    assert res == {"success": False, "error": "Failed to setup browser"}
 
 
 def test_browser_navigate_handler_invocation_with_active_tests(monkeypatch):
@@ -569,7 +569,7 @@ def test_browser_screenshot_handler_invocation_no_driver():
     assert tool.endpoint == "/api/tools/browser-agent/screenshot"
 
     res = tool.handler()
-    assert res == {"error": "Browser not initialized. Use navigate action first."}
+    assert res == {"success": False, "error": "Browser not initialized. Use navigate action first."}
 
 
 def test_browser_screenshot_handler_invocation_with_driver():
