@@ -255,7 +255,7 @@ def smbmap_scan(target: str, username: Optional[str] = None, password: Optional[
 @ToolRegistry.register(
     name="subfinder_enum",
     category="network",
-    description="Passive subdomain enumeration using Subfinder",
+    description="Passive subdomain enumeration using Subfinder - fast, low-noise, good first pass before a deeper scan with amass_enum",
     endpoint="/api/tools/subfinder"
 )
 def subfinder_enum(domain: str, silent: bool = True, all_sources: bool = False, additional_args: Optional[str] = None) -> Dict[str, Any]:

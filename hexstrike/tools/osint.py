@@ -5,7 +5,7 @@ from hexstrike.tools.base import run_tool_command
 @ToolRegistry.register(
     name="amass_enum",
     category="osint",
-    description="In-depth DNS enumeration and network mapping using OWASP Amass",
+    description="In-depth DNS enumeration and network mapping using OWASP Amass - active+passive, slower and more thorough than subfinder_enum",
     endpoint="/api/tools/amass"
 )
 def amass_enum(domain: str, additional_args: Optional[str] = None) -> Dict[str, Any]:
