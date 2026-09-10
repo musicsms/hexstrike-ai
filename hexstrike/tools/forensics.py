@@ -75,3 +75,18 @@ def steghide_run(cover_file: str, action: str = "extract", embed_file: Optional[
     if additional_args:
         cmd.extend(additional_args.split())
     return run_tool_command(cmd)
+
+@ToolRegistry.register(
+    name="volatility_scan",
+    category="forensics",
+    description="Memory forensics using Volatility",
+    endpoint="/api/tools/volatility"
+)
+def volatility_scan(memory_file: str, plugin: str, profile: Optional[str] = None, additional_args: Optional[str] = None) -> Dict[str, Any]:
+    cmd = ["volatility", "-f", memory_file]
+    if profile:
+        cmd.append(f"--profile={profile}")
+    cmd.append(plugin)
+    if additional_args:
+        cmd.extend(additional_args.split())
+    return run_tool_command(cmd)

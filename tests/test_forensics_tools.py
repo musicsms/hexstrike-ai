@@ -82,3 +82,14 @@ def test_steghide_run_handler_invocation_info(monkeypatch):
     res = tool.handler(cover_file="/tmp/img.jpg", action="info", passphrase="pw")
     assert res["success"] is True
     assert captured["cmd"] == ["steghide", "info", "/tmp/img.jpg", "-p", "pw"]
+
+
+def test_volatility_scan_handler_invocation(monkeypatch):
+    captured = _mock_execute(monkeypatch)
+    tool = ToolRegistry.get("volatility_scan")
+    assert tool is not None
+    assert tool.endpoint == "/api/tools/volatility"
+
+    res = tool.handler(memory_file="/tmp/mem.dmp", plugin="pslist", profile="Win10x64", additional_args="-v")
+    assert res["success"] is True
+    assert captured["cmd"] == ["volatility", "-f", "/tmp/mem.dmp", "--profile=Win10x64", "pslist", "-v"]
