@@ -8,7 +8,7 @@ from hexstrike.tools.base import run_tool_command
 @ToolRegistry.register(
     name="ffuf_fuzz",
     category="web",
-    description="Fast web fuzzer using ffuf",
+    description="Fast, general-purpose web fuzzer using ffuf - fuzzes any request position (paths, params, headers, host), not limited to directory discovery",
     endpoint="/api/tools/ffuf"
 )
 def ffuf_fuzz(url: str, wordlist: str = "/usr/share/wordlists/dirb/common.txt", additional_args: Optional[str] = None) -> Dict[str, Any]:
@@ -20,7 +20,7 @@ def ffuf_fuzz(url: str, wordlist: str = "/usr/share/wordlists/dirb/common.txt", 
 @ToolRegistry.register(
     name="gobuster_dir",
     category="web",
-    description="Directory and DNS busting using Gobuster",
+    description="Directory and DNS busting using Gobuster - simple, fast wordlist-based brute-forcing; good default when you don't need recursion or extension-aware wordlists",
     endpoint="/api/tools/gobuster"
 )
 def gobuster_dir(url: str, wordlist: str = "/usr/share/wordlists/dirb/common.txt", additional_args: Optional[str] = None) -> Dict[str, Any]:
@@ -64,7 +64,7 @@ def arjun_scan(url: str, method: str = "GET", wordlist: Optional[str] = None, de
 @ToolRegistry.register(
     name="dalfox_scan",
     category="web",
-    description="Advanced XSS vulnerability scanning using Dalfox",
+    description="Advanced XSS vulnerability scanning using Dalfox - fast parameter mining plus reflected/DOM XSS detection; the default choice for URL-based XSS testing",
     endpoint="/api/tools/dalfox"
 )
 def dalfox_scan(url: Optional[str] = None, pipe_mode: bool = False, blind: bool = False, mining_dom: bool = True, mining_dict: bool = True, custom_payload: Optional[str] = None, additional_args: Optional[str] = None) -> Dict[str, Any]:
@@ -87,7 +87,7 @@ def dalfox_scan(url: Optional[str] = None, pipe_mode: bool = False, blind: bool 
 @ToolRegistry.register(
     name="dirb_scan",
     category="web",
-    description="Directory and file brute-forcing using dirb",
+    description="Directory and file brute-forcing using dirb - recursive by default; the classic, simplest option, slower than ffuf/feroxbuster on large wordlists",
     endpoint="/api/tools/dirb"
 )
 def dirb_scan(url: str, wordlist: str = "/usr/share/wordlists/dirb/common.txt", additional_args: Optional[str] = None) -> Dict[str, Any]:
@@ -99,7 +99,7 @@ def dirb_scan(url: str, wordlist: str = "/usr/share/wordlists/dirb/common.txt", 
 @ToolRegistry.register(
     name="dirsearch_scan",
     category="web",
-    description="Advanced directory and file discovery using Dirsearch",
+    description="Advanced directory and file discovery using Dirsearch - extension-aware wordlists with recursion; a strong default choice for thorough content discovery",
     endpoint="/api/tools/dirsearch"
 )
 def dirsearch_scan(url: str, extensions: str = "php,html,js,txt,xml,json", wordlist: str = "/usr/share/wordlists/dirsearch/common.txt", threads: int = 30, recursive: bool = False, additional_args: Optional[str] = None) -> Dict[str, Any]:
@@ -126,7 +126,7 @@ def dotdotpwn_scan(target: str, module: str = "http", additional_args: Optional[
 @ToolRegistry.register(
     name="feroxbuster_scan",
     category="web",
-    description="Recursive content discovery using Feroxbuster",
+    description="Recursive content discovery using Feroxbuster - Rust-based, the fastest option here for large-scale recursive scans",
     endpoint="/api/tools/feroxbuster"
 )
 def feroxbuster_scan(url: str, wordlist: str = "/usr/share/wordlists/dirb/common.txt", threads: int = 10, additional_args: Optional[str] = None) -> Dict[str, Any]:
@@ -328,7 +328,7 @@ def x8_scan(url: str, wordlist: str = "/usr/share/wordlists/x8/params.txt", meth
 @ToolRegistry.register(
     name="xsser_scan",
     category="web",
-    description="XSS vulnerability testing using XSSer",
+    description="XSS vulnerability testing using XSSer - broad payload/WAF-bypass fuzzing engine; use when Dalfox misses a case or WAF evasion is needed",
     endpoint="/api/tools/xsser"
 )
 def xsser_scan(url: str, params: Optional[str] = None, additional_args: Optional[str] = None) -> Dict[str, Any]:
