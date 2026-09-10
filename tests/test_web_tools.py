@@ -294,11 +294,75 @@ def test_zap_scan_handler_invocation_daemon(monkeypatch):
     assert captured["cmd"] == ["zaproxy", "-daemon", "-host", "127.0.0.1", "-port", "9090", "-config", "api.key=KEY123"]
 
 
-def test_web_category_has_23_tools():
+def test_anew_process_handler_invocation(monkeypatch):
+    captured = {}
+
+    def fake_execute(cmd, **kwargs):
+        captured["cmd"] = cmd
+        captured["kwargs"] = kwargs
+        return {"success": True, "command": " ".join(cmd), "output": "", "cached": False}
+
+    monkeypatch.setattr("hexstrike.tools.base.is_tool_available", lambda name: True)
+    monkeypatch.setattr(default_process_manager, "execute_command", fake_execute)
+
+    tool = ToolRegistry.get("anew_process")
+    assert tool is not None
+    assert tool.category == "web"
+    assert tool.endpoint == "/api/tools/anew"
+
+    res = tool.handler(input_data="line1\nline2", output_file="/tmp/seen.txt", additional_args="-q")
+    assert res["success"] is True
+    assert captured["cmd"] == ["anew", "/tmp/seen.txt", "-q"]
+    assert captured["kwargs"]["stdin_input"] == "line1\nline2"
+
+
+def test_qsreplace_process_handler_invocation(monkeypatch):
+    captured = {}
+
+    def fake_execute(cmd, **kwargs):
+        captured["cmd"] = cmd
+        captured["kwargs"] = kwargs
+        return {"success": True, "command": " ".join(cmd), "output": "", "cached": False}
+
+    monkeypatch.setattr("hexstrike.tools.base.is_tool_available", lambda name: True)
+    monkeypatch.setattr(default_process_manager, "execute_command", fake_execute)
+
+    tool = ToolRegistry.get("qsreplace_process")
+    assert tool is not None
+    assert tool.endpoint == "/api/tools/qsreplace"
+
+    res = tool.handler(urls="http://a.com?x=1\nhttp://b.com?y=2", replacement="XSS", additional_args="-appendmode")
+    assert res["success"] is True
+    assert captured["cmd"] == ["qsreplace", "XSS", "-appendmode"]
+    assert captured["kwargs"]["stdin_input"] == "http://a.com?x=1\nhttp://b.com?y=2"
+
+
+def test_uro_filter_handler_invocation(monkeypatch):
+    captured = {}
+
+    def fake_execute(cmd, **kwargs):
+        captured["cmd"] = cmd
+        captured["kwargs"] = kwargs
+        return {"success": True, "command": " ".join(cmd), "output": "", "cached": False}
+
+    monkeypatch.setattr("hexstrike.tools.base.is_tool_available", lambda name: True)
+    monkeypatch.setattr(default_process_manager, "execute_command", fake_execute)
+
+    tool = ToolRegistry.get("uro_filter")
+    assert tool is not None
+    assert tool.endpoint == "/api/tools/uro"
+
+    res = tool.handler(urls="http://a.com/1\nhttp://a.com/2", whitelist="a.com", blacklist="b.com", additional_args="-v")
+    assert res["success"] is True
+    assert captured["cmd"] == ["uro", "--whitelist", "a.com", "--blacklist", "b.com", "-v"]
+    assert captured["kwargs"]["stdin_input"] == "http://a.com/1\nhttp://a.com/2"
+
+
+def test_web_category_has_26_tools():
     from hexstrike.core.registry import ToolRegistry
     import hexstrike.tools
     web_tools = ToolRegistry.get_by_category("web")
-    assert len(web_tools) == 23
+    assert len(web_tools) == 26
     names = {t.name for t in web_tools}
     assert names == {
         "ffuf_fuzz", "gobuster_dir", "sqlmap_scan",
@@ -306,4 +370,5 @@ def test_web_category_has_23_tools():
         "feroxbuster_scan", "gau_discover", "httpx_probe", "jaeles_scan", "katana_crawl",
         "nikto_scan", "nuclei_scan", "paramspider_mine", "wafw00f_scan",
         "waybackurls_discover", "wfuzz_scan", "wpscan_scan", "x8_scan", "xsser_scan", "zap_scan",
+        "anew_process", "qsreplace_process", "uro_filter",
     }

@@ -358,3 +358,45 @@ def zap_scan(target: Optional[str] = None, scan_type: str = "baseline", api_key:
     if additional_args:
         cmd.extend(additional_args.split())
     return run_tool_command(cmd)
+
+@ToolRegistry.register(
+    name="anew_process",
+    category="web",
+    description="Append new lines to a file, filtering duplicates, using anew",
+    endpoint="/api/tools/anew"
+)
+def anew_process(input_data: str, output_file: Optional[str] = None, additional_args: Optional[str] = None) -> Dict[str, Any]:
+    cmd = ["anew"]
+    if output_file:
+        cmd.append(output_file)
+    if additional_args:
+        cmd.extend(additional_args.split())
+    return run_tool_command(cmd, stdin_input=input_data)
+
+@ToolRegistry.register(
+    name="qsreplace_process",
+    category="web",
+    description="Query string parameter replacement using qsreplace",
+    endpoint="/api/tools/qsreplace"
+)
+def qsreplace_process(urls: str, replacement: str = "FUZZ", additional_args: Optional[str] = None) -> Dict[str, Any]:
+    cmd = ["qsreplace", replacement]
+    if additional_args:
+        cmd.extend(additional_args.split())
+    return run_tool_command(cmd, stdin_input=urls)
+
+@ToolRegistry.register(
+    name="uro_filter",
+    category="web",
+    description="Filter out semantically similar URLs using uro",
+    endpoint="/api/tools/uro"
+)
+def uro_filter(urls: str, whitelist: Optional[str] = None, blacklist: Optional[str] = None, additional_args: Optional[str] = None) -> Dict[str, Any]:
+    cmd = ["uro"]
+    if whitelist:
+        cmd.extend(["--whitelist", whitelist])
+    if blacklist:
+        cmd.extend(["--blacklist", blacklist])
+    if additional_args:
+        cmd.extend(additional_args.split())
+    return run_tool_command(cmd, stdin_input=urls)
