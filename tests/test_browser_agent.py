@@ -1,14 +1,9 @@
-import pytest
 from hexstrike.core.registry import ToolRegistry
 import hexstrike.tools
 from hexstrike.tools.browser import _browser_agent
 
-
-@pytest.fixture(autouse=True)
-def _reset_browser_agent():
-    _browser_agent.reset()
-    yield
-    _browser_agent.reset()
+# Autouse reset fixture lives in tests/conftest.py (shared with test_http_framework.py
+# and test_webtest_tools.py, which touch the same http_framework/browser singletons).
 
 
 class _FakeDriver:
