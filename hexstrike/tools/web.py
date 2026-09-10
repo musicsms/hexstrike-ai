@@ -180,7 +180,7 @@ def httpx_probe(target: str, probe: bool = True, tech_detect: bool = False, stat
 @ToolRegistry.register(
     name="jaeles_scan",
     category="web",
-    description="Advanced vulnerability scanning with custom signatures using Jaeles",
+    description="Advanced vulnerability scanning with custom signatures using Jaeles - for bespoke/private signature sets beyond nuclei_scan's public templates",
     endpoint="/api/tools/jaeles"
 )
 def jaeles_scan(url: str, signatures: Optional[str] = None, config: Optional[str] = None, threads: int = 20, timeout: int = 20, additional_args: Optional[str] = None) -> Dict[str, Any]:
@@ -214,7 +214,7 @@ def katana_crawl(url: str, depth: int = 3, js_crawl: bool = True, form_extractio
 @ToolRegistry.register(
     name="nikto_scan",
     category="web",
-    description="Web server vulnerability scanning using Nikto",
+    description="Web server vulnerability scanning using Nikto - broad but noisy checks for outdated software/server misconfigurations",
     endpoint="/api/tools/nikto"
 )
 def nikto_scan(target: str, additional_args: Optional[str] = None) -> Dict[str, Any]:
@@ -226,7 +226,7 @@ def nikto_scan(target: str, additional_args: Optional[str] = None) -> Dict[str, 
 @ToolRegistry.register(
     name="nuclei_scan",
     category="web",
-    description="Vulnerability scanning using Nuclei templates",
+    description="Vulnerability scanning using Nuclei templates - fast, community-maintained CVE/misconfig templates; good default first pass",
     endpoint="/api/tools/nuclei"
 )
 def nuclei_scan(target: str, severity: Optional[str] = None, tags: Optional[str] = None, template: Optional[str] = None, additional_args: Optional[str] = None) -> Dict[str, Any]:
@@ -342,7 +342,7 @@ def xsser_scan(url: str, params: Optional[str] = None, additional_args: Optional
 @ToolRegistry.register(
     name="zap_scan",
     category="web",
-    description="Web application scanning using OWASP ZAP",
+    description="Web application scanning using OWASP ZAP - full active+passive proxy-based scan, most thorough but slowest option here",
     endpoint="/api/tools/zap"
 )
 def zap_scan(target: Optional[str] = None, scan_type: str = "baseline", api_key: Optional[str] = None, daemon: bool = False, port: str = "8090", host: str = "0.0.0.0", format: str = "xml", output_file: Optional[str] = None, additional_args: Optional[str] = None) -> Dict[str, Any]:

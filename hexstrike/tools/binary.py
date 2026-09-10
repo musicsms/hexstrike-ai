@@ -6,7 +6,7 @@ from hexstrike.tools.base import run_tool_command
 @ToolRegistry.register(
     name="radare2_analyze",
     category="binary",
-    description="Reverse engineering framework using radare2",
+    description="Reverse engineering framework using radare2 - lightweight, scriptable static analysis and disassembly",
     endpoint="/api/tools/radare2"
 )
 def radare2_analyze(file_path: str, commands: str = "aaa; afl") -> Dict[str, Any]:
@@ -16,7 +16,7 @@ def radare2_analyze(file_path: str, commands: str = "aaa; afl") -> Dict[str, Any
 @ToolRegistry.register(
     name="gdb_analyze",
     category="binary",
-    description="Binary analysis and debugging using GDB",
+    description="Binary analysis and debugging using GDB - live/dynamic debugging (breakpoints, memory inspection), not static analysis",
     endpoint="/api/tools/gdb"
 )
 def gdb_analyze(binary: str, commands: Optional[str] = None, script_file: Optional[str] = None, additional_args: Optional[str] = None) -> Dict[str, Any]:
@@ -40,7 +40,7 @@ def gdb_analyze(binary: str, commands: Optional[str] = None, script_file: Option
 @ToolRegistry.register(
     name="ghidra_analyze",
     category="binary",
-    description="Advanced binary analysis and reverse engineering using Ghidra",
+    description="Advanced binary analysis and reverse engineering using Ghidra - full decompiler, best for deep static analysis of unfamiliar binaries",
     endpoint="/api/tools/ghidra"
 )
 def ghidra_analyze(binary: str, project_name: str = "hexstrike_analysis", script_file: Optional[str] = None, analysis_timeout: int = 300, output_format: str = "xml", additional_args: Optional[str] = None) -> Dict[str, Any]:
@@ -58,7 +58,7 @@ def ghidra_analyze(binary: str, project_name: str = "hexstrike_analysis", script
 @ToolRegistry.register(
     name="ropgadget_scan",
     category="binary",
-    description="ROP gadget search using ROPgadget",
+    description="ROP gadget search using ROPgadget - simple, fast gadget listing",
     endpoint="/api/tools/ropgadget"
 )
 def ropgadget_scan(binary: str, gadget_type: Optional[str] = None, additional_args: Optional[str] = None) -> Dict[str, Any]:
@@ -110,7 +110,7 @@ def strings_scan(file_path: str, min_len: int = 4, additional_args: Optional[str
 @ToolRegistry.register(
     name="objdump_scan",
     category="binary",
-    description="Binary analysis using objdump",
+    description="Binary analysis using objdump - quick disassembly/header dump, lighter weight than radare2/Ghidra",
     endpoint="/api/tools/objdump"
 )
 def objdump_scan(binary: str, disassemble: bool = True, additional_args: Optional[str] = None) -> Dict[str, Any]:
@@ -127,7 +127,7 @@ def objdump_scan(binary: str, disassemble: bool = True, additional_args: Optiona
 @ToolRegistry.register(
     name="ropper_scan",
     category="binary",
-    description="Advanced ROP/JOP gadget search using ropper",
+    description="Advanced ROP/JOP gadget search using ropper - also finds JOP/SYS gadgets with quality filtering, more capable than ropgadget_scan",
     endpoint="/api/tools/ropper"
 )
 def ropper_scan(binary: str, gadget_type: str = "rop", quality: int = 1, arch: Optional[str] = None, search_string: Optional[str] = None, additional_args: Optional[str] = None) -> Dict[str, Any]:
@@ -297,7 +297,7 @@ for func_addr, func in cfg.functions.items():
 @ToolRegistry.register(
     name="gdb_peda_analyze",
     category="binary",
-    description="Enhanced debugging and exploitation using GDB with PEDA",
+    description="Enhanced debugging and exploitation using GDB with PEDA - adds exploit-dev helpers (pattern search, heap inspection) on top of gdb_analyze",
     endpoint="/api/tools/gdb-peda"
 )
 def gdb_peda_analyze(binary: Optional[str] = None, commands: Optional[str] = None, attach_pid: int = 0, core_file: Optional[str] = None, additional_args: Optional[str] = None) -> Dict[str, Any]:
