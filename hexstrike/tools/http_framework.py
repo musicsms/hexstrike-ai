@@ -198,6 +198,14 @@ class HTTPTestingFramework:
     def _get_recent_vulns(self, limit: int = 10):
         return self.vulnerabilities[-limit:] if self.vulnerabilities else []
 
+    def send_custom_request(self, request_spec: dict) -> dict:
+        url = request_spec.get('url', '')
+        method = request_spec.get('method', 'GET')
+        headers = request_spec.get('headers') or {}
+        cookies = request_spec.get('cookies') or {}
+        data = request_spec.get('data')
+        return self.intercept_request(url, method, data, headers, cookies)
+
 
 _http_framework = HTTPTestingFramework()
 
@@ -247,3 +255,13 @@ def http_framework_proxy_history() -> Dict[str, Any]:
         "total_requests": len(_http_framework.proxy_history),
         "vulnerabilities": _http_framework.vulnerabilities,
     }
+
+
+@ToolRegistry.register(
+    name="http_framework_repeater",
+    category="webtest",
+    description="Resend a custom HTTP request with explicit fields",
+    endpoint="/api/tools/http-framework/repeater"
+)
+def http_framework_repeater(request: Optional[dict] = None) -> Dict[str, Any]:
+    return _http_framework.send_custom_request(request or {})

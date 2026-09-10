@@ -249,3 +249,31 @@ def test_http_framework_proxy_history_handler_invocation_after_requests(monkeypa
     res = tool.handler()
     assert res["total_requests"] == 2
     assert len(res["history"]) == 2
+
+
+def test_http_framework_repeater_handler_invocation(monkeypatch):
+    captured = {}
+
+    def fake_get(url, params=None, headers=None, timeout=None):
+        captured["url"] = url
+        return _FakeResponse(status_code=200, headers={
+            "X-Frame-Options": "DENY", "X-Content-Type-Options": "nosniff",
+            "X-XSS-Protection": "1", "Strict-Transport-Security": "max-age=1",
+            "Content-Security-Policy": "default-src 'self'",
+        }, text="ok")
+
+    monkeypatch.setattr(_http_framework.session, "get", fake_get)
+
+    tool = ToolRegistry.get("http_framework_repeater")
+    assert tool is not None
+    assert tool.endpoint == "/api/tools/http-framework/repeater"
+
+    res = tool.handler(request={"url": "http://example.com/repeat", "method": "GET"})
+    assert res["success"] is True
+    assert captured["url"] == "http://example.com/repeat"
+
+
+def test_http_framework_repeater_handler_invocation_no_request():
+    tool = ToolRegistry.get("http_framework_repeater")
+    res = tool.handler()
+    assert res["success"] is False
