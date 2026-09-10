@@ -16,6 +16,27 @@ def _mock_execute(monkeypatch):
     return captured
 
 
+def test_amass_enum_handler_invocation(monkeypatch):
+    captured = _mock_execute(monkeypatch)
+    tool = ToolRegistry.get("amass_enum")
+    assert tool is not None
+    assert tool.category == "osint"
+    assert tool.endpoint == "/api/tools/amass"
+
+    res = tool.handler(domain="example.com", additional_args="-active")
+    assert res["success"] is True
+    assert captured["cmd"] == ["amass", "enum", "-d", "example.com", "-active"]
+
+
+def test_amass_enum_handler_invocation_no_additional_args(monkeypatch):
+    captured = _mock_execute(monkeypatch)
+    tool = ToolRegistry.get("amass_enum")
+
+    res = tool.handler(domain="example.com")
+    assert res["success"] is True
+    assert captured["cmd"] == ["amass", "enum", "-d", "example.com"]
+
+
 def test_hakrawler_crawl_handler_invocation_defaults(monkeypatch):
     captured = _mock_execute(monkeypatch)
     tool = ToolRegistry.get("hakrawler_crawl")
