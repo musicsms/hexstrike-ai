@@ -104,3 +104,15 @@ def test_volatility3_scan_handler_invocation(monkeypatch):
     res = tool.handler(memory_file="/tmp/mem.dmp", plugin="windows.pslist", output_file="/tmp/out.txt", additional_args="-v")
     assert res["success"] is True
     assert captured["cmd"] == ["vol.py", "-f", "/tmp/mem.dmp", "windows.pslist", "-o", "/tmp/out.txt", "-v"]
+
+
+def test_forensics_category_has_6_tools():
+    from hexstrike.core.registry import ToolRegistry
+    import hexstrike.tools
+    forensics_tools = ToolRegistry.get_by_category("forensics")
+    assert len(forensics_tools) == 6
+    names = {t.name for t in forensics_tools}
+    assert names == {
+        "binwalk_scan", "exiftool_scan", "foremost_scan",
+        "steghide_run", "volatility_scan", "volatility3_scan",
+    }
