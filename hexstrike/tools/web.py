@@ -1,6 +1,7 @@
 import base64
 import json
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List, Optional, Annotated
+from pydantic import Field
 import requests
 from hexstrike.core.registry import ToolRegistry
 from hexstrike.tools.base import run_tool_command
@@ -116,7 +117,11 @@ def dirsearch_scan(url: str, extensions: str = "php,html,js,txt,xml,json", wordl
     description="Directory traversal fuzzing using DotDotPwn",
     endpoint="/api/tools/dotdotpwn"
 )
-def dotdotpwn_scan(target: str, module: str = "http", additional_args: Optional[str] = None) -> Dict[str, Any]:
+def dotdotpwn_scan(
+    target: str,
+    module: Annotated[str, Field(description="DotDotPwn protocol module to test path traversal against, e.g. 'http', 'ftp', 'tftp', 'payload'")] = "http",
+    additional_args: Optional[str] = None,
+) -> Dict[str, Any]:
     cmd = ["dotdotpwn", "-m", module, "-h", target]
     if additional_args:
         cmd.extend(additional_args.split())
@@ -229,7 +234,13 @@ def nikto_scan(target: str, additional_args: Optional[str] = None) -> Dict[str, 
     description="Vulnerability scanning using Nuclei templates - fast, community-maintained CVE/misconfig templates; good default first pass",
     endpoint="/api/tools/nuclei"
 )
-def nuclei_scan(target: str, severity: Optional[str] = None, tags: Optional[str] = None, template: Optional[str] = None, additional_args: Optional[str] = None) -> Dict[str, Any]:
+def nuclei_scan(
+    target: str,
+    severity: Annotated[Optional[str], Field(description="Comma-separated severity filter: 'info', 'low', 'medium', 'high', 'critical'")] = None,
+    tags: Annotated[Optional[str], Field(description="Comma-separated Nuclei template tags to include, e.g. 'cve,exposure,misconfig'")] = None,
+    template: Annotated[Optional[str], Field(description="Path to a specific Nuclei template or template directory to run, instead of the default set")] = None,
+    additional_args: Optional[str] = None,
+) -> Dict[str, Any]:
     cmd = ["nuclei", "-u", target]
     if severity:
         cmd.extend(["-severity", severity])
@@ -345,7 +356,17 @@ def xsser_scan(url: str, params: Optional[str] = None, additional_args: Optional
     description="Web application scanning using OWASP ZAP - full active+passive proxy-based scan, most thorough but slowest option here",
     endpoint="/api/tools/zap"
 )
-def zap_scan(target: Optional[str] = None, scan_type: str = "baseline", api_key: Optional[str] = None, daemon: bool = False, port: str = "8090", host: str = "0.0.0.0", format: str = "xml", output_file: Optional[str] = None, additional_args: Optional[str] = None) -> Dict[str, Any]:
+def zap_scan(
+    target: Optional[str] = None,
+    scan_type: Annotated[str, Field(description="Not currently read by this handler - every call runs ZAP's -quickurl scan regardless of this value")] = "baseline",
+    api_key: Optional[str] = None,
+    daemon: bool = False,
+    port: str = "8090",
+    host: str = "0.0.0.0",
+    format: str = "xml",
+    output_file: Optional[str] = None,
+    additional_args: Optional[str] = None,
+) -> Dict[str, Any]:
     if daemon:
         cmd = ["zaproxy", "-daemon", "-host", host, "-port", port]
         if api_key:
@@ -382,7 +403,11 @@ def anew_process(input_data: str, output_file: Optional[str] = None, additional_
     description="Query string parameter replacement using qsreplace",
     endpoint="/api/tools/qsreplace"
 )
-def qsreplace_process(urls: str, replacement: str = "FUZZ", additional_args: Optional[str] = None) -> Dict[str, Any]:
+def qsreplace_process(
+    urls: str,
+    replacement: Annotated[str, Field(description="Value that replaces every query-string parameter value, e.g. 'FUZZ' as a fuzzing placeholder for another tool to substitute")] = "FUZZ",
+    additional_args: Optional[str] = None,
+) -> Dict[str, Any]:
     cmd = ["qsreplace", replacement]
     if additional_args:
         cmd.extend(additional_args.split())
@@ -490,7 +515,10 @@ def jwt_analyzer_scan(jwt_token: str, target_url: Optional[str] = None) -> Dict[
     description="API schema analysis for security issues (OpenAPI/Swagger)",
     endpoint="/api/tools/api_schema_analyzer"
 )
-def api_schema_analyzer_scan(schema_url: str, schema_type: str = "openapi") -> Dict[str, Any]:
+def api_schema_analyzer_scan(
+    schema_url: str,
+    schema_type: Annotated[str, Field(description="Schema format: 'openapi'/'swagger' get full endpoint/method extraction; other values skip that parsing")] = "openapi",
+) -> Dict[str, Any]:
     try:
         response = requests.get(schema_url, timeout=30)
         schema_content = response.text

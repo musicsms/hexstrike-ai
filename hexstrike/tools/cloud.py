@@ -1,5 +1,6 @@
 from pathlib import Path
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, Annotated
+from pydantic import Field
 from hexstrike.core.registry import ToolRegistry
 from hexstrike.tools.base import run_tool_command
 
@@ -9,7 +10,15 @@ from hexstrike.tools.base import run_tool_command
     description="AWS/multi-cloud security assessment using Prowler",
     endpoint="/api/tools/prowler"
 )
-def prowler_scan(provider: str = "aws", profile: Optional[str] = "default", region: Optional[str] = None, checks: Optional[str] = None, output_dir: str = "/tmp/prowler_output", output_format: str = "json", additional_args: Optional[str] = None) -> Dict[str, Any]:
+def prowler_scan(
+    provider: Annotated[str, Field(description="Cloud provider to assess: 'aws', 'azure', or 'gcp'")] = "aws",
+    profile: Optional[str] = "default",
+    region: Optional[str] = None,
+    checks: Optional[str] = None,
+    output_dir: str = "/tmp/prowler_output",
+    output_format: str = "json",
+    additional_args: Optional[str] = None,
+) -> Dict[str, Any]:
     Path(output_dir).mkdir(parents=True, exist_ok=True)
     cmd = ["prowler", provider]
     if profile:
@@ -32,7 +41,14 @@ def prowler_scan(provider: str = "aws", profile: Optional[str] = "default", regi
     description="Container/filesystem vulnerability scanning using Trivy",
     endpoint="/api/tools/trivy"
 )
-def trivy_scan(target: str, scan_type: str = "image", output_format: str = "json", severity: Optional[str] = None, output_file: Optional[str] = None, additional_args: Optional[str] = None) -> Dict[str, Any]:
+def trivy_scan(
+    target: str,
+    scan_type: Annotated[str, Field(description="What target is: 'image' (container image), 'fs' (filesystem/directory), 'repo' (git repo), or 'config' (IaC config)")] = "image",
+    output_format: str = "json",
+    severity: Annotated[Optional[str], Field(description="Comma-separated severity filter, e.g. 'HIGH,CRITICAL'")] = None,
+    output_file: Optional[str] = None,
+    additional_args: Optional[str] = None,
+) -> Dict[str, Any]:
     cmd = ["trivy", scan_type, target]
     if output_format:
         cmd.extend(["--format", output_format])
@@ -53,7 +69,14 @@ def trivy_scan(target: str, scan_type: str = "image", output_format: str = "json
     description="Multi-cloud security assessment using Scout Suite",
     endpoint="/api/tools/scout-suite"
 )
-def scout_suite_scan(provider: str = "aws", profile: Optional[str] = "default", report_dir: str = "/tmp/scout-suite", services: Optional[str] = None, exceptions: Optional[str] = None, additional_args: Optional[str] = None) -> Dict[str, Any]:
+def scout_suite_scan(
+    provider: Annotated[str, Field(description="Cloud provider to audit: 'aws', 'azure', 'gcp', or 'aliyun'")] = "aws",
+    profile: Optional[str] = "default",
+    report_dir: str = "/tmp/scout-suite",
+    services: Annotated[Optional[str], Field(description="Comma-separated service names to limit the audit to, e.g. 's3,iam,ec2'")] = None,
+    exceptions: Optional[str] = None,
+    additional_args: Optional[str] = None,
+) -> Dict[str, Any]:
     Path(report_dir).mkdir(parents=True, exist_ok=True)
     cmd = ["scout", provider]
     if profile and provider == "aws":
@@ -75,7 +98,12 @@ def scout_suite_scan(provider: str = "aws", profile: Optional[str] = "default", 
     description="AWS network visualization and security analysis using CloudMapper",
     endpoint="/api/tools/cloudmapper"
 )
-def cloudmapper_run(action: str = "collect", account: Optional[str] = None, config: Optional[str] = "config.json", additional_args: Optional[str] = None) -> Dict[str, Any]:
+def cloudmapper_run(
+    action: Annotated[str, Field(description="CloudMapper subcommand: 'collect' (pull AWS data), 'report' (generate findings), 'webserver' (serve the network visualization)")] = "collect",
+    account: Optional[str] = None,
+    config: Optional[str] = "config.json",
+    additional_args: Optional[str] = None,
+) -> Dict[str, Any]:
     cmd = ["cloudmapper", action]
     if account:
         cmd.extend(["--account", account])
@@ -91,7 +119,15 @@ def cloudmapper_run(action: str = "collect", account: Optional[str] = None, conf
     description="Kubernetes penetration testing using kube-hunter",
     endpoint="/api/tools/kube-hunter"
 )
-def kube_hunter_scan(target: Optional[str] = None, remote: Optional[str] = None, cidr: Optional[str] = None, interface: Optional[str] = None, active: bool = False, report: str = "json", additional_args: Optional[str] = None) -> Dict[str, Any]:
+def kube_hunter_scan(
+    target: Annotated[Optional[str], Field(description="Remote host/IP to scan (takes priority over remote/cidr/interface)")] = None,
+    remote: Annotated[Optional[str], Field(description="Remote host/IP to scan; only used if target is not set")] = None,
+    cidr: Annotated[Optional[str], Field(description="CIDR range to scan, e.g. '10.0.0.0/24'; only used if target/remote are not set")] = None,
+    interface: Annotated[Optional[str], Field(description="Local network interface to scan on, e.g. 'eth0'; only used if target/remote/cidr are not set")] = None,
+    active: bool = False,
+    report: str = "json",
+    additional_args: Optional[str] = None,
+) -> Dict[str, Any]:
     cmd = ["kube-hunter"]
     if target:
         cmd.extend(["--remote", target])
@@ -191,7 +227,14 @@ def clair_scan(image: str, config: str = "/etc/clair/config.yaml", output_format
     description="Infrastructure as code security scanning using Checkov - broadest IaC/language coverage (Terraform, CloudFormation, Kubernetes, etc.)",
     endpoint="/api/tools/checkov"
 )
-def checkov_scan(directory: str = ".", framework: Optional[str] = None, check: Optional[str] = None, skip_check: Optional[str] = None, output_format: str = "json", additional_args: Optional[str] = None) -> Dict[str, Any]:
+def checkov_scan(
+    directory: str = ".",
+    framework: Annotated[Optional[str], Field(description="Limit the scan to one IaC framework, e.g. 'terraform', 'cloudformation', 'kubernetes', 'dockerfile' (omit to scan all supported frameworks)")] = None,
+    check: Annotated[Optional[str], Field(description="Comma-separated Checkov check IDs to run exclusively, e.g. 'CKV_AWS_20'")] = None,
+    skip_check: Annotated[Optional[str], Field(description="Comma-separated Checkov check IDs to skip, e.g. 'CKV_AWS_20'")] = None,
+    output_format: str = "json",
+    additional_args: Optional[str] = None,
+) -> Dict[str, Any]:
     cmd = ["checkov", "-d", directory]
     if framework:
         cmd.extend(["--framework", framework])
@@ -211,7 +254,14 @@ def checkov_scan(directory: str = ".", framework: Optional[str] = None, check: O
     description="Infrastructure as code security scanning using Terrascan - OPA-based policy engine, good for custom policy-as-code requirements",
     endpoint="/api/tools/terrascan"
 )
-def terrascan_scan(scan_type: str = "all", iac_dir: str = ".", policy_type: Optional[str] = None, output_format: str = "json", severity: Optional[str] = None, additional_args: Optional[str] = None) -> Dict[str, Any]:
+def terrascan_scan(
+    scan_type: Annotated[str, Field(description="IaC type to scan: 'all', 'terraform', 'k8s', 'helm', 'kustomize', 'docker'")] = "all",
+    iac_dir: str = ".",
+    policy_type: Annotated[Optional[str], Field(description="Policy set to apply, e.g. 'aws', 'azure', 'gcp', 'k8s' (defaults to matching scan_type)")] = None,
+    output_format: str = "json",
+    severity: Annotated[Optional[str], Field(description="Minimum severity to report: 'low', 'medium', or 'high'")] = None,
+    additional_args: Optional[str] = None,
+) -> Dict[str, Any]:
     cmd = ["terrascan", "scan", "-t", scan_type, "-d", iac_dir]
     if policy_type:
         cmd.extend(["-p", policy_type])

@@ -1,5 +1,6 @@
 from pathlib import Path
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, Annotated
+from pydantic import Field
 from hexstrike.core.registry import ToolRegistry
 from hexstrike.tools.base import run_tool_command
 
@@ -9,7 +10,10 @@ from hexstrike.tools.base import run_tool_command
     description="Reverse engineering framework using radare2 - lightweight, scriptable static analysis and disassembly",
     endpoint="/api/tools/radare2"
 )
-def radare2_analyze(file_path: str, commands: str = "aaa; afl") -> Dict[str, Any]:
+def radare2_analyze(
+    file_path: str,
+    commands: Annotated[str, Field(description="Semicolon-separated radare2 command string, e.g. 'aaa; afl' (analyze all, list functions)")] = "aaa; afl",
+) -> Dict[str, Any]:
     cmd = ["r2", "-q", "-c", commands, file_path]
     return run_tool_command(cmd)
 
@@ -19,7 +23,12 @@ def radare2_analyze(file_path: str, commands: str = "aaa; afl") -> Dict[str, Any
     description="Binary analysis and debugging using GDB - live/dynamic debugging (breakpoints, memory inspection), not static analysis",
     endpoint="/api/tools/gdb"
 )
-def gdb_analyze(binary: str, commands: Optional[str] = None, script_file: Optional[str] = None, additional_args: Optional[str] = None) -> Dict[str, Any]:
+def gdb_analyze(
+    binary: str,
+    commands: Annotated[Optional[str], Field(description="Newline-separated GDB commands to run in batch mode, e.g. 'break main\\nrun\\ninfo registers'")] = None,
+    script_file: Optional[str] = None,
+    additional_args: Optional[str] = None,
+) -> Dict[str, Any]:
     cmd = ["gdb", binary]
     if script_file:
         cmd.extend(["-x", script_file])
@@ -61,7 +70,11 @@ def ghidra_analyze(binary: str, project_name: str = "hexstrike_analysis", script
     description="ROP gadget search using ROPgadget - simple, fast gadget listing",
     endpoint="/api/tools/ropgadget"
 )
-def ropgadget_scan(binary: str, gadget_type: Optional[str] = None, additional_args: Optional[str] = None) -> Dict[str, Any]:
+def ropgadget_scan(
+    binary: str,
+    gadget_type: Annotated[Optional[str], Field(description="Restrict to one gadget class, e.g. 'pop|ret', 'jmp', 'call' (ROPgadget's --only filter)")] = None,
+    additional_args: Optional[str] = None,
+) -> Dict[str, Any]:
     cmd = ["ROPgadget", "--binary", binary]
     if gadget_type:
         cmd.extend(["--only", gadget_type])
@@ -130,7 +143,14 @@ def objdump_scan(binary: str, disassemble: bool = True, additional_args: Optiona
     description="Advanced ROP/JOP gadget search using ropper - also finds JOP/SYS gadgets with quality filtering, more capable than ropgadget_scan",
     endpoint="/api/tools/ropper"
 )
-def ropper_scan(binary: str, gadget_type: str = "rop", quality: int = 1, arch: Optional[str] = None, search_string: Optional[str] = None, additional_args: Optional[str] = None) -> Dict[str, Any]:
+def ropper_scan(
+    binary: str,
+    gadget_type: Annotated[str, Field(description="Gadget class to search: 'rop', 'jop', 'sys', or 'all'")] = "rop",
+    quality: Annotated[int, Field(description="Gadget quality filter, 1-5; only values >1 are passed to ropper's --quality (stricter = fewer, cleaner gadgets)")] = 1,
+    arch: Optional[str] = None,
+    search_string: Optional[str] = None,
+    additional_args: Optional[str] = None,
+) -> Dict[str, Any]:
     cmd = ["ropper", "--file", binary]
     if gadget_type == "rop":
         cmd.append("--rop")
@@ -156,7 +176,13 @@ def ropper_scan(binary: str, gadget_type: str = "rop", quality: int = 1, arch: O
     description="CTF binary exploitation setup using pwninit",
     endpoint="/api/tools/pwninit"
 )
-def pwninit_setup(binary: str, libc: Optional[str] = None, ld: Optional[str] = None, template_type: Optional[str] = "python", additional_args: Optional[str] = None) -> Dict[str, Any]:
+def pwninit_setup(
+    binary: str,
+    libc: Optional[str] = None,
+    ld: Optional[str] = None,
+    template_type: Annotated[Optional[str], Field(description="Exploit template language pwninit should generate, e.g. 'python' (pwntools) or 'rust'")] = "python",
+    additional_args: Optional[str] = None,
+) -> Dict[str, Any]:
     cmd = ["pwninit", "--bin", binary]
     if libc:
         cmd.extend(["--libc", libc])
@@ -174,7 +200,11 @@ def pwninit_setup(binary: str, libc: Optional[str] = None, ld: Optional[str] = N
     description="One-shot RCE gadget search in libc using one_gadget",
     endpoint="/api/tools/one-gadget"
 )
-def one_gadget_find(libc_path: str, level: int = 1, additional_args: Optional[str] = None) -> Dict[str, Any]:
+def one_gadget_find(
+    libc_path: str,
+    level: Annotated[int, Field(description="Constraint strictness 0-2: 0 finds only unconditionally-usable gadgets, 2 includes gadgets needing extra memory/register setup")] = 1,
+    additional_args: Optional[str] = None,
+) -> Dict[str, Any]:
     cmd = ["one_gadget", libc_path, "--level", str(level)]
     if additional_args:
         cmd.extend(additional_args.split())
@@ -186,7 +216,14 @@ def one_gadget_find(libc_path: str, level: int = 1, additional_args: Optional[st
     description="Exploit development and automation using Pwntools",
     endpoint="/api/tools/pwntools"
 )
-def pwntools_exploit(script_content: Optional[str] = None, target_binary: str = "", target_host: str = "", target_port: int = 0, exploit_type: str = "local", additional_args: Optional[str] = None) -> Dict[str, Any]:
+def pwntools_exploit(
+    script_content: Optional[str] = None,
+    target_binary: str = "",
+    target_host: str = "",
+    target_port: int = 0,
+    exploit_type: Annotated[str, Field(description="Not currently read by the generated template - the template picks local vs remote automatically based on whether target_binary or target_host/target_port is set")] = "local",
+    additional_args: Optional[str] = None,
+) -> Dict[str, Any]:
     script_file = "/tmp/pwntools_exploit.py"
     if script_content:
         Path(script_file).write_text(script_content)
@@ -235,7 +272,14 @@ p.interactive()
     description="Symbolic execution and binary analysis using angr",
     endpoint="/api/tools/angr"
 )
-def angr_analyze(binary: str, script_content: Optional[str] = None, find_address: Optional[str] = None, avoid_addresses: Optional[str] = None, analysis_type: str = "symbolic", additional_args: Optional[str] = None) -> Dict[str, Any]:
+def angr_analyze(
+    binary: str,
+    script_content: Optional[str] = None,
+    find_address: Optional[str] = None,
+    avoid_addresses: Optional[str] = None,
+    analysis_type: Annotated[str, Field(description="'symbolic' to run symbolic execution toward find_address/avoid_addresses, or 'cfg' to build and summarize a control-flow graph")] = "symbolic",
+    additional_args: Optional[str] = None,
+) -> Dict[str, Any]:
     script_file = "/tmp/angr_analysis.py"
     if script_content:
         Path(script_file).write_text(script_content)
@@ -300,7 +344,13 @@ for func_addr, func in cfg.functions.items():
     description="Enhanced debugging and exploitation using GDB with PEDA - adds exploit-dev helpers (pattern search, heap inspection) on top of gdb_analyze",
     endpoint="/api/tools/gdb-peda"
 )
-def gdb_peda_analyze(binary: Optional[str] = None, commands: Optional[str] = None, attach_pid: int = 0, core_file: Optional[str] = None, additional_args: Optional[str] = None) -> Dict[str, Any]:
+def gdb_peda_analyze(
+    binary: Optional[str] = None,
+    commands: Annotated[Optional[str], Field(description="Newline-separated GDB/PEDA commands to run after PEDA loads, e.g. 'pattern create 200\\nrun'")] = None,
+    attach_pid: int = 0,
+    core_file: Optional[str] = None,
+    additional_args: Optional[str] = None,
+) -> Dict[str, Any]:
     cmd = ["gdb", "-q"]
     if binary:
         cmd.append(binary)
@@ -342,7 +392,12 @@ def _resolve_libc_database_dir() -> Optional[str]:
     description="libc identification and offset lookup using libc-database",
     endpoint="/api/tools/libc-database"
 )
-def libc_database_lookup(action: str = "find", symbols: Optional[str] = None, libc_id: Optional[str] = None, additional_args: Optional[str] = None) -> Dict[str, Any]:
+def libc_database_lookup(
+    action: Annotated[str, Field(description="'find' to search by leaked symbol addresses, 'dump' to dump offsets for a known libc_id, 'download' to fetch that libc binary")] = "find",
+    symbols: Optional[str] = None,
+    libc_id: Optional[str] = None,
+    additional_args: Optional[str] = None,
+) -> Dict[str, Any]:
     if action == "find":
         cmd = ["./find", symbols]
     elif action == "dump":

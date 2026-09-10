@@ -1,5 +1,6 @@
 from pathlib import Path
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, Annotated
+from pydantic import Field
 from hexstrike.core.registry import ToolRegistry
 from hexstrike.tools.base import run_tool_command
 
@@ -24,7 +25,12 @@ def binwalk_scan(file_path: str, extract: bool = False, additional_args: Optiona
     description="Metadata extraction using ExifTool",
     endpoint="/api/tools/exiftool"
 )
-def exiftool_scan(file_path: str, output_format: Optional[str] = None, tags: Optional[str] = None, additional_args: Optional[str] = None) -> Dict[str, Any]:
+def exiftool_scan(
+    file_path: str,
+    output_format: Annotated[Optional[str], Field(description="ExifTool output flag without the leading dash, e.g. 'json', 'xml', 'csv'")] = None,
+    tags: Annotated[Optional[str], Field(description="Specific tag to extract, without the leading dash, e.g. 'GPS:all' or 'DateTimeOriginal'")] = None,
+    additional_args: Optional[str] = None,
+) -> Dict[str, Any]:
     cmd = ["exiftool"]
     if output_format:
         cmd.append(f"-{output_format}")
@@ -59,7 +65,14 @@ def foremost_scan(input_file: str, output_dir: str = "/tmp/foremost_output", fil
     description="Steganography analysis using Steghide",
     endpoint="/api/tools/steghide"
 )
-def steghide_run(cover_file: str, action: str = "extract", embed_file: Optional[str] = None, passphrase: Optional[str] = None, output_file: Optional[str] = None, additional_args: Optional[str] = None) -> Dict[str, Any]:
+def steghide_run(
+    cover_file: str,
+    action: Annotated[str, Field(description="'extract' to pull hidden data out of cover_file, 'embed' to hide embed_file inside it, 'info' to inspect cover_file without extracting")] = "extract",
+    embed_file: Optional[str] = None,
+    passphrase: Optional[str] = None,
+    output_file: Optional[str] = None,
+    additional_args: Optional[str] = None,
+) -> Dict[str, Any]:
     if action == "extract":
         cmd = ["steghide", "extract", "-sf", cover_file]
         if output_file:
@@ -82,7 +95,12 @@ def steghide_run(cover_file: str, action: str = "extract", embed_file: Optional[
     description="Memory forensics using Volatility - legacy 2.x branch, needed only for older/unsupported profiles",
     endpoint="/api/tools/volatility"
 )
-def volatility_scan(memory_file: str, plugin: str, profile: Optional[str] = None, additional_args: Optional[str] = None) -> Dict[str, Any]:
+def volatility_scan(
+    memory_file: str,
+    plugin: Annotated[str, Field(description="Volatility 2.x plugin name, e.g. 'pslist', 'netscan', 'malfind', 'hivelist'")],
+    profile: Annotated[Optional[str], Field(description="OS profile identifying the memory image, e.g. 'Win7SP1x64', 'LinuxUbuntu1804x64' (required by most plugins on Volatility 2.x)")] = None,
+    additional_args: Optional[str] = None,
+) -> Dict[str, Any]:
     cmd = ["volatility", "-f", memory_file]
     if profile:
         cmd.append(f"--profile={profile}")
@@ -97,7 +115,12 @@ def volatility_scan(memory_file: str, plugin: str, profile: Optional[str] = None
     description="Advanced memory forensics using Volatility 3 - actively maintained, prefer this unless a legacy profile requires volatility_scan",
     endpoint="/api/tools/volatility3"
 )
-def volatility3_scan(memory_file: str, plugin: str, output_file: Optional[str] = None, additional_args: Optional[str] = None) -> Dict[str, Any]:
+def volatility3_scan(
+    memory_file: str,
+    plugin: Annotated[str, Field(description="Volatility 3 plugin name, e.g. 'windows.pslist', 'windows.netscan', 'linux.bash' (Volatility 3 auto-detects the OS profile, unlike volatility_scan)")],
+    output_file: Optional[str] = None,
+    additional_args: Optional[str] = None,
+) -> Dict[str, Any]:
     cmd = ["vol.py", "-f", memory_file, plugin]
     if output_file:
         cmd.extend(["-o", output_file])
