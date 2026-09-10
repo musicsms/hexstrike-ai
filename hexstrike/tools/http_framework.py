@@ -206,6 +206,52 @@ class HTTPTestingFramework:
         data = request_spec.get('data')
         return self.intercept_request(url, method, data, headers, cookies)
 
+    def intruder_sniper(self, url: str, method: str = 'GET', location: str = 'query',
+                         params: list = None, payloads: list = None, base_data: dict = None,
+                         max_requests: int = 100) -> dict:
+        params = params or []
+        payloads = payloads or ["'\"<>`, ${7*7}"]
+        base_data = base_data or {}
+        interesting = []
+        total = 0
+        baseline = self.intercept_request(url, method, base_data)
+        base_status = baseline.get('response', {}).get('status_code') if baseline.get('success') else None
+        base_len = baseline.get('response', {}).get('size') if baseline.get('success') else None
+        for p in params:
+            for pay in payloads:
+                if total >= max_requests:
+                    break
+                m_url = url
+                m_data = dict(base_data)
+                m_headers = {}
+                if location == 'query':
+                    pr = urlparse(url)
+                    q = dict(parse_qsl(pr.query, keep_blank_values=True))
+                    q[p] = pay
+                    m_url = urlunparse((pr.scheme, pr.netloc, pr.path, pr.params, urlencode(q), pr.fragment))
+                elif location == 'body':
+                    m_data[p] = pay
+                elif location == 'headers':
+                    m_headers[p] = pay
+                elif location == 'cookie':
+                    self.session.cookies.set(p, pay)
+                resp = self.intercept_request(m_url, method, m_data, m_headers)
+                total += 1
+                if not resp.get('success'):
+                    continue
+                r = resp['response']
+                changed = (base_status is not None and r.get('status_code') != base_status) or (base_len is not None and abs(r.get('size', 0) - base_len) > 150)
+                reflected = pay in (r.get('content') or '')
+                if changed or reflected:
+                    interesting.append({
+                        'param': p,
+                        'payload': pay,
+                        'status_code': r.get('status_code'),
+                        'size': r.get('size'),
+                        'reflected': reflected
+                    })
+        return {'success': True, 'tested': total, 'interesting': interesting[:50]}
+
 
 _http_framework = HTTPTestingFramework()
 
@@ -265,3 +311,13 @@ def http_framework_proxy_history() -> Dict[str, Any]:
 )
 def http_framework_repeater(request: Optional[dict] = None) -> Dict[str, Any]:
     return _http_framework.send_custom_request(request or {})
+
+
+@ToolRegistry.register(
+    name="http_framework_intruder",
+    category="webtest",
+    description="Sniper-mode parameter fuzzing across an HTTP endpoint",
+    endpoint="/api/tools/http-framework/intruder"
+)
+def http_framework_intruder(url: str, method: str = "GET", location: str = "query", params: Optional[list] = None, payloads: Optional[list] = None, base_data: Optional[dict] = None, max_requests: int = 100) -> Dict[str, Any]:
+    return _http_framework.intruder_sniper(url, method, location, params, payloads, base_data, max_requests)

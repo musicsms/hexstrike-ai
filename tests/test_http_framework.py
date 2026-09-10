@@ -277,3 +277,51 @@ def test_http_framework_repeater_handler_invocation_no_request():
     tool = ToolRegistry.get("http_framework_repeater")
     res = tool.handler()
     assert res["success"] is False
+
+
+def test_http_framework_intruder_handler_invocation_detects_reflection(monkeypatch):
+    call_count = {"n": 0}
+
+    def fake_get(url, params=None, headers=None, timeout=None):
+        call_count["n"] += 1
+        if call_count["n"] == 1:
+            # baseline request
+            return _FakeResponse(status_code=200, headers={
+                "X-Frame-Options": "DENY", "X-Content-Type-Options": "nosniff",
+                "X-XSS-Protection": "1", "Strict-Transport-Security": "max-age=1",
+                "Content-Security-Policy": "default-src 'self'",
+            }, text="normal page")
+        # fuzzed request reflects the payload
+        return _FakeResponse(status_code=200, headers={
+            "X-Frame-Options": "DENY", "X-Content-Type-Options": "nosniff",
+            "X-XSS-Protection": "1", "Strict-Transport-Security": "max-age=1",
+            "Content-Security-Policy": "default-src 'self'",
+        }, text="reflected: PAYLOAD_MARKER")
+
+    monkeypatch.setattr(_http_framework.session, "get", fake_get)
+
+    tool = ToolRegistry.get("http_framework_intruder")
+    assert tool is not None
+    assert tool.endpoint == "/api/tools/http-framework/intruder"
+
+    res = tool.handler(url="http://example.com/search", params=["q"], payloads=["PAYLOAD_MARKER"])
+    assert res["success"] is True
+    assert res["tested"] == 1
+    assert len(res["interesting"]) == 1
+    assert res["interesting"][0]["reflected"] is True
+
+
+def test_http_framework_intruder_handler_invocation_no_findings(monkeypatch):
+    def fake_get(url, params=None, headers=None, timeout=None):
+        return _FakeResponse(status_code=200, headers={
+            "X-Frame-Options": "DENY", "X-Content-Type-Options": "nosniff",
+            "X-XSS-Protection": "1", "Strict-Transport-Security": "max-age=1",
+            "Content-Security-Policy": "default-src 'self'",
+        }, text="unchanged page")
+
+    monkeypatch.setattr(_http_framework.session, "get", fake_get)
+
+    tool = ToolRegistry.get("http_framework_intruder")
+    res = tool.handler(url="http://example.com/search", params=["q"], payloads=["harmless"])
+    assert res["tested"] == 1
+    assert res["interesting"] == []
