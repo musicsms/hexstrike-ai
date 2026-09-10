@@ -358,11 +358,11 @@ def test_uro_filter_handler_invocation(monkeypatch):
     assert captured["kwargs"]["stdin_input"] == "http://a.com/1\nhttp://a.com/2"
 
 
-def test_web_category_has_26_tools():
+def test_web_category_has_30_tools():
     from hexstrike.core.registry import ToolRegistry
     import hexstrike.tools
     web_tools = ToolRegistry.get_by_category("web")
-    assert len(web_tools) == 26
+    assert len(web_tools) == 30
     names = {t.name for t in web_tools}
     assert names == {
         "ffuf_fuzz", "gobuster_dir", "sqlmap_scan",
@@ -371,4 +371,5 @@ def test_web_category_has_26_tools():
         "nikto_scan", "nuclei_scan", "paramspider_mine", "wafw00f_scan",
         "waybackurls_discover", "wfuzz_scan", "wpscan_scan", "x8_scan", "xsser_scan", "zap_scan",
         "anew_process", "qsreplace_process", "uro_filter",
+        "jwt_analyzer_scan", "api_schema_analyzer_scan", "graphql_scanner_scan", "api_fuzzer_scan",
     }
