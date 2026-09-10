@@ -327,3 +327,28 @@ quit
         except OSError:
             pass
     return result
+
+def _resolve_libc_database_dir() -> Optional[str]:
+    if Path("/opt/libc-database").is_dir():
+        return "/opt/libc-database"
+    home_dir = Path.home() / "libc-database"
+    if home_dir.is_dir():
+        return str(home_dir)
+    return None
+
+@ToolRegistry.register(
+    name="libc_database_lookup",
+    category="binary",
+    description="libc identification and offset lookup using libc-database",
+    endpoint="/api/tools/libc-database"
+)
+def libc_database_lookup(action: str = "find", symbols: Optional[str] = None, libc_id: Optional[str] = None, additional_args: Optional[str] = None) -> Dict[str, Any]:
+    if action == "find":
+        cmd = ["./find", symbols]
+    elif action == "dump":
+        cmd = ["./dump", libc_id]
+    elif action == "download":
+        cmd = ["./download", libc_id]
+    if additional_args:
+        cmd.extend(additional_args.split())
+    return run_tool_command(cmd, cwd=_resolve_libc_database_dir())

@@ -11,15 +11,17 @@ class ProcessManager:
         self.cache_hits = 0
         self.cache_misses = 0
 
-    def _get_cache_key(self, command: List[str], stdin_input: Optional[str] = None) -> str:
+    def _get_cache_key(self, command: List[str], stdin_input: Optional[str] = None, cwd: Optional[str] = None) -> str:
         key = " ".join(command)
         if stdin_input is not None:
             key += f"\x00{stdin_input}"
+        if cwd is not None:
+            key += f"\x00cwd={cwd}"
         return key
 
-    def execute_command(self, command: List[str], timeout: int = COMMAND_TIMEOUT, use_cache: bool = True, stdin_input: Optional[str] = None) -> Dict[str, Any]:
+    def execute_command(self, command: List[str], timeout: int = COMMAND_TIMEOUT, use_cache: bool = True, stdin_input: Optional[str] = None, cwd: Optional[str] = None) -> Dict[str, Any]:
         cmd_str = " ".join(command)
-        cache_key = self._get_cache_key(command, stdin_input)
+        cache_key = self._get_cache_key(command, stdin_input, cwd)
         now = time.time()
 
         if use_cache and cache_key in self.cache:
@@ -41,6 +43,8 @@ class ProcessManager:
             run_kwargs = dict(stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=timeout)
             if stdin_input is not None:
                 run_kwargs["input"] = stdin_input
+            if cwd is not None:
+                run_kwargs["cwd"] = cwd
             res = subprocess.run(command, **run_kwargs)
             elapsed = f"{time.time() - start_time:.2f}s"
             success = (res.returncode == 0)

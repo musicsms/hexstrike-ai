@@ -378,13 +378,95 @@ def test_gdb_peda_analyze_handler_invocation_no_commands(monkeypatch):
     ]
 
 
-def test_binary_category_has_14_tools():
+def test_libc_database_lookup_handler_invocation_find(monkeypatch):
+    real_is_dir = Path.is_dir
+
+    def fake_is_dir(self):
+        if str(self) == "/opt/libc-database":
+            return True
+        return real_is_dir(self)
+
+    monkeypatch.setattr(Path, "is_dir", fake_is_dir)
+
+    captured = {}
+
+    def fake_execute(cmd, **kwargs):
+        captured["cmd"] = cmd
+        captured["kwargs"] = kwargs
+        return {"success": True, "command": " ".join(cmd), "output": "", "cached": False}
+
+    monkeypatch.setattr("hexstrike.tools.base.is_tool_available", lambda name: True)
+    monkeypatch.setattr(default_process_manager, "execute_command", fake_execute)
+
+    tool = ToolRegistry.get("libc_database_lookup")
+    assert tool is not None
+    assert tool.category == "binary"
+    assert tool.endpoint == "/api/tools/libc-database"
+
+    res = tool.handler(action="find", symbols="printf:0x64 system:0x123", additional_args="-v")
+    assert res["success"] is True
+    assert captured["cmd"] == ["./find", "printf:0x64 system:0x123", "-v"]
+    assert captured["kwargs"]["cwd"] == "/opt/libc-database"
+
+
+def test_libc_database_lookup_handler_invocation_dump_home_fallback(monkeypatch):
+    home_libc_dir = str(Path.home() / "libc-database")
+    real_is_dir = Path.is_dir
+
+    def fake_is_dir(self):
+        if str(self) == "/opt/libc-database":
+            return False
+        if str(self) == home_libc_dir:
+            return True
+        return real_is_dir(self)
+
+    monkeypatch.setattr(Path, "is_dir", fake_is_dir)
+
+    captured = {}
+
+    def fake_execute(cmd, **kwargs):
+        captured["cmd"] = cmd
+        captured["kwargs"] = kwargs
+        return {"success": True, "command": " ".join(cmd), "output": "", "cached": False}
+
+    monkeypatch.setattr("hexstrike.tools.base.is_tool_available", lambda name: True)
+    monkeypatch.setattr(default_process_manager, "execute_command", fake_execute)
+
+    tool = ToolRegistry.get("libc_database_lookup")
+    res = tool.handler(action="dump", libc_id="libc6_2.31-0ubuntu9_amd64")
+    assert res["success"] is True
+    assert captured["cmd"] == ["./dump", "libc6_2.31-0ubuntu9_amd64"]
+    assert captured["kwargs"]["cwd"] == home_libc_dir
+
+
+def test_libc_database_lookup_handler_invocation_download_neither_dir_found(monkeypatch):
+    monkeypatch.setattr(Path, "is_dir", lambda self: False)
+
+    captured = {}
+
+    def fake_execute(cmd, **kwargs):
+        captured["cmd"] = cmd
+        captured["kwargs"] = kwargs
+        return {"success": True, "command": " ".join(cmd), "output": "", "cached": False}
+
+    monkeypatch.setattr("hexstrike.tools.base.is_tool_available", lambda name: True)
+    monkeypatch.setattr(default_process_manager, "execute_command", fake_execute)
+
+    tool = ToolRegistry.get("libc_database_lookup")
+    res = tool.handler(action="download", libc_id="abc123")
+    assert res["success"] is True
+    assert captured["cmd"] == ["./download", "abc123"]
+    assert captured["kwargs"]["cwd"] is None
+
+
+def test_binary_category_has_15_tools():
     binary_tools = ToolRegistry.get_by_category("binary")
-    assert len(binary_tools) == 14
+    assert len(binary_tools) == 15
     names = {t.name for t in binary_tools}
     assert names == {
         "radare2_analyze", "gdb_analyze", "ghidra_analyze", "ropgadget_scan",
         "checksec_scan", "xxd_dump", "strings_scan", "objdump_scan",
         "ropper_scan", "pwninit_setup", "one_gadget_find",
         "pwntools_exploit", "angr_analyze", "gdb_peda_analyze",
+        "libc_database_lookup",
     }
