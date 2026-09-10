@@ -2,7 +2,8 @@ from typing import Dict, Any, Optional, List
 import re
 import requests
 from datetime import datetime
-from urllib.parse import urlparse, parse_qsl, urlencode, urlunparse
+from urllib.parse import urlparse, parse_qsl, urlencode, urlunparse, urljoin
+from bs4 import BeautifulSoup
 from hexstrike.core.registry import ToolRegistry
 
 
@@ -252,6 +253,63 @@ class HTTPTestingFramework:
                     })
         return {'success': True, 'tested': total, 'interesting': interesting[:50]}
 
+    def spider_website(self, base_url: str, max_depth: int = 3, max_pages: int = 100) -> dict:
+        try:
+            discovered_urls = set()
+            forms = []
+            to_visit = [(base_url, 0)]
+            visited = set()
+
+            while to_visit and len(discovered_urls) < max_pages:
+                current_url, depth = to_visit.pop(0)
+
+                if current_url in visited or depth > max_depth:
+                    continue
+
+                visited.add(current_url)
+
+                try:
+                    response = self.session.get(current_url, timeout=10)
+                    if response.status_code == 200:
+                        discovered_urls.add(current_url)
+                        soup = BeautifulSoup(response.text, 'html.parser')
+
+                        for link in soup.find_all('a', href=True):
+                            href = link['href']
+                            full_url = urljoin(current_url, href)
+                            if urlparse(full_url).netloc == urlparse(base_url).netloc:
+                                if full_url not in visited and depth < max_depth:
+                                    to_visit.append((full_url, depth + 1))
+
+                        for form in soup.find_all('form'):
+                            form_data = {
+                                'url': current_url,
+                                'action': urljoin(current_url, form.get('action', '')),
+                                'method': form.get('method', 'GET').upper(),
+                                'inputs': []
+                            }
+                            for input_tag in form.find_all(['input', 'textarea', 'select']):
+                                form_data['inputs'].append({
+                                    'name': input_tag.get('name', ''),
+                                    'type': input_tag.get('type', 'text'),
+                                    'value': input_tag.get('value', '')
+                                })
+                            forms.append(form_data)
+
+                except Exception:
+                    continue
+
+            return {
+                'success': True,
+                'discovered_urls': list(discovered_urls),
+                'forms': forms,
+                'total_pages': len(discovered_urls),
+                'vulnerabilities': self._get_recent_vulns()
+            }
+
+        except Exception as e:
+            return {'success': False, 'error': str(e)}
+
 
 _http_framework = HTTPTestingFramework()
 
@@ -321,3 +379,13 @@ def http_framework_repeater(request: Optional[dict] = None) -> Dict[str, Any]:
 )
 def http_framework_intruder(url: str, method: str = "GET", location: str = "query", params: Optional[list] = None, payloads: Optional[list] = None, base_data: Optional[dict] = None, max_requests: int = 100) -> Dict[str, Any]:
     return _http_framework.intruder_sniper(url, method, location, params, payloads, base_data, max_requests)
+
+
+@ToolRegistry.register(
+    name="http_framework_spider",
+    category="webtest",
+    description="Spider a website to discover endpoints and forms",
+    endpoint="/api/tools/http-framework/spider"
+)
+def http_framework_spider(url: str, max_depth: int = 3, max_pages: int = 100) -> Dict[str, Any]:
+    return _http_framework.spider_website(url, max_depth, max_pages)

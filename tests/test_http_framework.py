@@ -325,3 +325,48 @@ def test_http_framework_intruder_handler_invocation_no_findings(monkeypatch):
     res = tool.handler(url="http://example.com/search", params=["q"], payloads=["harmless"])
     assert res["tested"] == 1
     assert res["interesting"] == []
+
+
+_SAMPLE_HTML = """
+<html><body>
+<a href="/page2">Page 2</a>
+<a href="https://external.example.org/other">External</a>
+<form action="/submit" method="POST">
+    <input name="username" type="text" value="">
+    <input name="password" type="password" value="">
+</form>
+</body></html>
+"""
+
+
+def test_http_framework_spider_handler_invocation(monkeypatch):
+    def fake_get(url, timeout=None):
+        if url == "http://example.com/":
+            return _FakeResponse(status_code=200, text=_SAMPLE_HTML)
+        return _FakeResponse(status_code=200, text="<html><body>no links</body></html>")
+
+    monkeypatch.setattr(_http_framework.session, "get", fake_get)
+
+    tool = ToolRegistry.get("http_framework_spider")
+    assert tool is not None
+    assert tool.endpoint == "/api/tools/http-framework/spider"
+
+    res = tool.handler(url="http://example.com/", max_depth=1, max_pages=10)
+    assert res["success"] is True
+    assert "http://example.com/" in res["discovered_urls"]
+    assert "http://example.com/page2" in res["discovered_urls"]
+    assert not any("external.example.org" in u for u in res["discovered_urls"])
+    assert len(res["forms"]) == 1
+    assert res["forms"][0]["method"] == "POST"
+    assert {i["name"] for i in res["forms"][0]["inputs"]} == {"username", "password"}
+
+
+def test_http_framework_spider_handler_invocation_respects_max_pages(monkeypatch):
+    def fake_get(url, timeout=None):
+        return _FakeResponse(status_code=200, text='<html><body><a href="/next">next</a></body></html>')
+
+    monkeypatch.setattr(_http_framework.session, "get", fake_get)
+
+    tool = ToolRegistry.get("http_framework_spider")
+    res = tool.handler(url="http://example.com/", max_depth=10, max_pages=1)
+    assert res["total_pages"] <= 1
