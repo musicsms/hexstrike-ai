@@ -28,6 +28,11 @@ class HTTPTestingFramework:
         self.match_replace_rules = []
         self.scope = None
         self._req_id = 0
+        self.session.cookies.clear()
+        self.session.headers.clear()
+        self.session.headers.update({
+            'User-Agent': 'HexStrike-HTTP-Framework/1.0 (Advanced Security Testing)'
+        })
 
     def set_match_replace_rules(self, rules: list):
         self.match_replace_rules = rules or []
@@ -317,7 +322,7 @@ _http_framework = HTTPTestingFramework()
 @ToolRegistry.register(
     name="http_framework_set_rules",
     category="webtest",
-    description="Configure HTTP request/response match-replace rules",
+    description="Configure HTTP request match-replace rules",
     endpoint="/api/tools/http-framework/set-rules"
 )
 def http_framework_set_rules(rules: Optional[list] = None) -> Dict[str, Any]:
@@ -328,7 +333,7 @@ def http_framework_set_rules(rules: Optional[list] = None) -> Dict[str, Any]:
 @ToolRegistry.register(
     name="http_framework_set_scope",
     category="webtest",
-    description="Restrict HTTP framework testing to a host scope",
+    description="Set the host scope that gates match/replace rewriting (does not block out-of-scope requests)",
     endpoint="/api/tools/http-framework/set-scope"
 )
 def http_framework_set_scope(host: str, include_subdomains: bool = True) -> Dict[str, Any]:
@@ -339,7 +344,7 @@ def http_framework_set_scope(host: str, include_subdomains: bool = True) -> Dict
 @ToolRegistry.register(
     name="http_framework_request",
     category="webtest",
-    description="Intercept and analyze an HTTP request/response for vulnerabilities",
+    description="Send and analyze an HTTP request/response for vulnerabilities",
     endpoint="/api/tools/http-framework/request"
 )
 def http_framework_request(url: str, method: str = "GET", data: Optional[dict] = None, headers: Optional[dict] = None, cookies: Optional[dict] = None) -> Dict[str, Any]:

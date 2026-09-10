@@ -47,6 +47,8 @@ def test_reset_clears_all_mutable_state():
     _http_framework.match_replace_rules.append({"fake": "rule"})
     _http_framework.scope = {"host": "example.com", "include_subdomains": True}
     _http_framework._req_id = 5
+    _http_framework.session.cookies.set("sid", "leaked")
+    _http_framework.session.headers.update({"Authorization": "Bearer secret"})
 
     _http_framework.reset()
 
@@ -55,6 +57,8 @@ def test_reset_clears_all_mutable_state():
     assert _http_framework.match_replace_rules == []
     assert _http_framework.scope is None
     assert _http_framework._req_id == 0
+    assert "sid" not in _http_framework.session.cookies
+    assert "Authorization" not in _http_framework.session.headers
 
 
 def test_in_scope_no_scope_set_allows_everything():
