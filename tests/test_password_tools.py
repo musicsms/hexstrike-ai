@@ -17,6 +17,27 @@ def _mock_execute(monkeypatch):
     return captured
 
 
+def test_hydra_attack_handler_invocation_with_user_and_wordlist(monkeypatch):
+    captured = _mock_execute(monkeypatch)
+    tool = ToolRegistry.get("hydra_attack")
+    assert tool is not None
+    assert tool.category == "password"
+    assert tool.endpoint == "/api/tools/hydra"
+
+    res = tool.handler(target="127.0.0.1", service="ssh", user="admin", wordlist="/tmp/rockyou.txt", additional_args="-t 4")
+    assert res["success"] is True
+    assert captured["cmd"] == ["hydra", "-l", "admin", "-P", "/tmp/rockyou.txt", "-t", "4", "127.0.0.1", "ssh"]
+
+
+def test_hydra_attack_handler_invocation_minimal(monkeypatch):
+    captured = _mock_execute(monkeypatch)
+    tool = ToolRegistry.get("hydra_attack")
+
+    res = tool.handler(target="127.0.0.1", service="ftp")
+    assert res["success"] is True
+    assert captured["cmd"] == ["hydra", "127.0.0.1", "ftp"]
+
+
 def test_hashcat_scan_handler_invocation_wordlist_mode(monkeypatch):
     captured = _mock_execute(monkeypatch)
     tool = ToolRegistry.get("hashcat_scan")
