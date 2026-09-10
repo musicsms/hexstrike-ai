@@ -11,15 +11,19 @@ class ProcessManager:
         self.cache_hits = 0
         self.cache_misses = 0
 
-    def _get_cache_key(self, command: List[str]) -> str:
-        return " ".join(command)
+    def _get_cache_key(self, command: List[str], stdin_input: Optional[str] = None) -> str:
+        key = " ".join(command)
+        if stdin_input is not None:
+            key += f"\x00{stdin_input}"
+        return key
 
-    def execute_command(self, command: List[str], timeout: int = COMMAND_TIMEOUT, use_cache: bool = True) -> Dict[str, Any]:
+    def execute_command(self, command: List[str], timeout: int = COMMAND_TIMEOUT, use_cache: bool = True, stdin_input: Optional[str] = None) -> Dict[str, Any]:
         cmd_str = " ".join(command)
+        cache_key = self._get_cache_key(command, stdin_input)
         now = time.time()
 
-        if use_cache and cmd_str in self.cache:
-            entry = self.cache[cmd_str]
+        if use_cache and cache_key in self.cache:
+            entry = self.cache[cache_key]
             if now - entry["timestamp"] < self.cache_ttl:
                 self.cache_hits += 1
                 return {
@@ -34,13 +38,10 @@ class ProcessManager:
         self.cache_misses += 1
         start_time = time.time()
         try:
-            res = subprocess.run(
-                command,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                text=True,
-                timeout=timeout
-            )
+            run_kwargs = dict(stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=timeout)
+            if stdin_input is not None:
+                run_kwargs["input"] = stdin_input
+            res = subprocess.run(command, **run_kwargs)
             elapsed = f"{time.time() - start_time:.2f}s"
             success = (res.returncode == 0)
             output = res.stdout
@@ -59,7 +60,7 @@ class ProcessManager:
                 if len(self.cache) >= self.cache_size:
                     oldest_key = min(self.cache.keys(), key=lambda k: self.cache[k]["timestamp"])
                     del self.cache[oldest_key]
-                self.cache[cmd_str] = {
+                self.cache[cache_key] = {
                     "success": success,
                     "output": output,
                     "error": error,

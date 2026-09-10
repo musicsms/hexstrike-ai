@@ -22,3 +22,17 @@ def test_process_manager_timeout():
     result = pm.execute_command(["sleep", "2"], timeout=1, use_cache=False)
     assert result["success"] is False
     assert "timed out" in result["error"].lower()
+
+def test_process_manager_stdin_input():
+    pm = ProcessManager()
+    result = pm.execute_command(["cat"], stdin_input="hello from stdin\n", use_cache=False)
+    assert result["success"] is True
+    assert result["output"] == "hello from stdin\n"
+
+def test_process_manager_stdin_input_cache_key_does_not_collide():
+    pm = ProcessManager()
+    r1 = pm.execute_command(["cat"], stdin_input="first\n", use_cache=True)
+    r2 = pm.execute_command(["cat"], stdin_input="second\n", use_cache=True)
+    assert r1["output"] == "first\n"
+    assert r2["output"] == "second\n"
+    assert r2["cached"] is False
