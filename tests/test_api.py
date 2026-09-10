@@ -25,6 +25,7 @@ def test_tools_list_endpoint(client):
 
 def test_tool_execution_route(client, monkeypatch):
     from hexstrike.core.process import default_process_manager
+    monkeypatch.setattr("hexstrike.tools.base.is_tool_available", lambda name: True)
     monkeypatch.setattr(default_process_manager, "execute_command", lambda cmd, **kwargs: {
         "success": True, "command": " ".join(cmd), "output": "ok", "cached": False
     })

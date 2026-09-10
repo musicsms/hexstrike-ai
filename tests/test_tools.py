@@ -15,6 +15,7 @@ def test_tools_registered():
 
 def test_nmap_handler_invocation(monkeypatch):
     from hexstrike.core.process import default_process_manager
+    monkeypatch.setattr("hexstrike.tools.base.is_tool_available", lambda name: True)
     nmap = ToolRegistry.get("nmap_scan")
 
     def mock_execute(cmd, **kwargs):
