@@ -4,6 +4,8 @@ from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
 import json
 import requests
+import time
+from datetime import datetime
 from urllib.parse import urljoin
 from hexstrike.core.registry import ToolRegistry
 
@@ -305,6 +307,53 @@ class BrowserAgent:
                 break
         return {'active_findings': findings, 'tested_forms': tested}
 
+    def navigate_and_inspect(self, url: str, wait_time: int = 5) -> dict:
+        try:
+            if not self.driver:
+                if not self.setup_browser():
+                    return {'success': False, 'error': 'Failed to setup browser'}
+
+            self.driver.get(url)
+            time.sleep(wait_time)
+
+            screenshot_path = f"/tmp/hexstrike_screenshot_{int(time.time())}.png"
+            self.driver.save_screenshot(screenshot_path)
+            self.screenshots.append(screenshot_path)
+
+            page_source = self.driver.page_source
+            self.page_sources.append({'url': url, 'source': page_source[:50000], 'timestamp': datetime.now().isoformat()})
+
+            page_info = {
+                'title': self.driver.title,
+                'url': self.driver.current_url,
+                'cookies': [{'name': c['name'], 'value': c['value'], 'domain': c['domain']} for c in self.driver.get_cookies()],
+                'local_storage': self._get_local_storage(),
+                'session_storage': self._get_session_storage(),
+                'forms': self._extract_forms(),
+                'links': self._extract_links(),
+                'inputs': self._extract_inputs(),
+                'scripts': self._extract_scripts(),
+                'network_requests': self._get_network_logs(),
+                'console_errors': self._get_console_errors()
+            }
+
+            security_analysis = self._analyze_page_security(page_source, page_info)
+            extended_passive = self._extended_passive_analysis(page_info, page_source)
+            security_analysis['issues'].extend(extended_passive['issues'])
+            security_analysis['total_issues'] = len(security_analysis['issues'])
+            security_analysis['security_score'] = max(0, 100 - (security_analysis['total_issues'] * 5))
+            security_analysis['passive_modules'] = extended_passive.get('modules', [])
+
+            return {
+                'success': True,
+                'page_info': page_info,
+                'security_analysis': security_analysis,
+                'screenshot': screenshot_path,
+                'timestamp': datetime.now().isoformat()
+            }
+        except Exception as e:
+            return {'success': False, 'error': str(e)}
+
 
 _browser_agent = BrowserAgent()
 
@@ -333,3 +382,21 @@ def browser_status() -> Dict[str, Any]:
         "screenshots_taken": len(_browser_agent.screenshots),
         "pages_visited": len(_browser_agent.page_sources),
     }
+
+
+@ToolRegistry.register(
+    name="browser_navigate",
+    category="webtest",
+    description="Navigate to a URL with a real browser and inspect the rendered page for security issues",
+    endpoint="/api/tools/browser-agent/navigate"
+)
+def browser_navigate(url: str, headless: bool = True, wait_time: int = 5, proxy_port: Optional[int] = None, active_tests: bool = False) -> Dict[str, Any]:
+    if not _browser_agent.driver:
+        setup_success = _browser_agent.setup_browser(headless, proxy_port)
+        if not setup_success:
+            return {"error": "Failed to setup browser"}
+    result = _browser_agent.navigate_and_inspect(url, wait_time)
+    if result.get("success") and active_tests:
+        active_results = _browser_agent.run_active_tests(result.get("page_info", {}))
+        result["active_tests"] = active_results
+    return result

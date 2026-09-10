@@ -441,3 +441,122 @@ def test_run_active_tests_no_reflection_no_finding(monkeypatch):
     result = _browser_agent.run_active_tests(page_info)
     assert result["active_findings"] == []
     assert result["tested_forms"] == 1
+
+
+def test_navigate_and_inspect_real_browser_end_to_end():
+    """The one real (non-mocked) Selenium test in this plan - proves the full
+    setup -> navigate -> extract -> analyze -> close pipeline actually works
+    against real chromium/chromedriver, not just mocked driver objects."""
+    fixture_html = (
+        "data:text/html,"
+        "<html><body>"
+        "<h1>Test Page</h1>"
+        "<a href='http://example.com/link1'>Link 1</a>"
+        "<form action='/submit' method='POST'>"
+        "<input name='username' type='text' value=''>"
+        "</form>"
+        "<script>var inline_test_marker = 1;</script>"
+        "</body></html>"
+    )
+    assert _browser_agent.setup_browser(headless=True) is True
+    try:
+        result = _browser_agent.navigate_and_inspect(fixture_html, wait_time=1)
+        assert result["success"] is True
+        assert result["page_info"]["title"] == ""
+        assert len(result["page_info"]["forms"]) == 1
+        # Real Chrome canonicalizes the HTMLFormElement.method IDL property to
+        # lowercase ("post") per the HTML Living Standard, and Selenium 4.x's
+        # get_attribute() returns the JS property value (not the literal HTML
+        # attribute text) when a same-named property exists. This is real,
+        # correct browser behavior (verified against actual chromedriver in
+        # this environment), so the comparison here is case-insensitive.
+        assert result["page_info"]["forms"][0]["method"].upper() == "POST"
+        assert len(result["page_info"]["links"]) == 1
+        assert "security_analysis" in result
+        assert "total_issues" in result["security_analysis"]
+        assert result["screenshot"].startswith("/tmp/hexstrike_screenshot_")
+        import os
+        assert os.path.exists(result["screenshot"])
+        os.remove(result["screenshot"])
+    finally:
+        _browser_agent.close_browser()
+
+
+def test_navigate_and_inspect_lazy_setup_failure_mocked(monkeypatch):
+    def fake_setup_browser(headless=True, proxy_port=None):
+        return False
+    monkeypatch.setattr(_browser_agent, "setup_browser", fake_setup_browser)
+    _browser_agent.driver = None
+
+    result = _browser_agent.navigate_and_inspect("http://example.com")
+    assert result == {"success": False, "error": "Failed to setup browser"}
+
+
+def test_navigate_and_inspect_exception_returns_error_mocked(monkeypatch):
+    class _RaisingDriver:
+        def get(self, url):
+            raise Exception("navigation timeout")
+
+        def quit(self):
+            pass
+    _browser_agent.driver = _RaisingDriver()
+
+    result = _browser_agent.navigate_and_inspect("http://example.com")
+    assert result["success"] is False
+    assert "navigation timeout" in result["error"]
+
+
+class _FakeDriverHandle:
+    def quit(self):
+        pass
+
+
+def test_browser_navigate_handler_invocation_lazy_setup(monkeypatch):
+    setup_calls = []
+
+    def fake_setup_browser(headless=True, proxy_port=None):
+        setup_calls.append((headless, proxy_port))
+        _browser_agent.driver = _FakeDriverHandle()
+        return True
+
+    def fake_navigate_and_inspect(url, wait_time=5):
+        return {"success": True, "page_info": {"forms": []}, "security_analysis": {}, "screenshot": "/tmp/x.png", "timestamp": "now"}
+
+    monkeypatch.setattr(_browser_agent, "setup_browser", fake_setup_browser)
+    monkeypatch.setattr(_browser_agent, "navigate_and_inspect", fake_navigate_and_inspect)
+    _browser_agent.driver = None
+
+    tool = ToolRegistry.get("browser_navigate")
+    assert tool is not None
+    assert tool.endpoint == "/api/tools/browser-agent/navigate"
+
+    res = tool.handler(url="http://example.com", headless=False, wait_time=2)
+    assert res["success"] is True
+    assert setup_calls == [(False, None)]
+    assert "active_tests" not in res
+
+
+def test_browser_navigate_handler_invocation_setup_failure(monkeypatch):
+    monkeypatch.setattr(_browser_agent, "setup_browser", lambda headless=True, proxy_port=None: False)
+    _browser_agent.driver = None
+
+    tool = ToolRegistry.get("browser_navigate")
+    res = tool.handler(url="http://example.com")
+    assert res == {"error": "Failed to setup browser"}
+
+
+def test_browser_navigate_handler_invocation_with_active_tests(monkeypatch):
+    _browser_agent.driver = _FakeDriverHandle()
+
+    def fake_navigate_and_inspect(url, wait_time=5):
+        return {"success": True, "page_info": {"forms": [{"action": "/s", "method": "GET", "inputs": [{"name": "q", "type": "text"}]}]}, "security_analysis": {}, "screenshot": "/tmp/x.png", "timestamp": "now"}
+
+    def fake_run_active_tests(page_info):
+        return {"active_findings": [{"type": "reflected_xss"}], "tested_forms": 1}
+
+    monkeypatch.setattr(_browser_agent, "navigate_and_inspect", fake_navigate_and_inspect)
+    monkeypatch.setattr(_browser_agent, "run_active_tests", fake_run_active_tests)
+
+    tool = ToolRegistry.get("browser_navigate")
+    res = tool.handler(url="http://example.com", active_tests=True)
+    assert res["active_tests"]["tested_forms"] == 1
