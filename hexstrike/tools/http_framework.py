@@ -232,3 +232,18 @@ def http_framework_set_scope(host: str, include_subdomains: bool = True) -> Dict
 )
 def http_framework_request(url: str, method: str = "GET", data: Optional[dict] = None, headers: Optional[dict] = None, cookies: Optional[dict] = None) -> Dict[str, Any]:
     return _http_framework.intercept_request(url, method, data, headers, cookies)
+
+
+@ToolRegistry.register(
+    name="http_framework_proxy_history",
+    category="webtest",
+    description="Retrieve captured HTTP proxy history and vulnerabilities",
+    endpoint="/api/tools/http-framework/proxy-history"
+)
+def http_framework_proxy_history() -> Dict[str, Any]:
+    return {
+        "success": True,
+        "history": _http_framework.proxy_history[-100:],
+        "total_requests": len(_http_framework.proxy_history),
+        "vulnerabilities": _http_framework.vulnerabilities,
+    }
