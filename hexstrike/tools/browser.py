@@ -173,6 +173,46 @@ class BrowserAgent:
         except Exception:
             return []
 
+    def _analyze_page_security(self, page_source: str, page_info: dict) -> dict:
+        issues = []
+
+        for storage_type, storage_data in [('localStorage', page_info.get('local_storage', {})),
+                                            ('sessionStorage', page_info.get('session_storage', {}))]:
+            for key, value in storage_data.items():
+                if any(sensitive in key.lower() for sensitive in ['password', 'token', 'secret', 'key']):
+                    issues.append({
+                        'type': 'sensitive_data_storage',
+                        'severity': 'high',
+                        'description': f'Sensitive data found in {storage_type}: {key}',
+                        'location': storage_type
+                    })
+
+        for form in page_info.get('forms', []):
+            has_csrf = any('csrf' in input_data['name'].lower() or 'token' in input_data['name'].lower()
+                          for input_data in form['inputs'])
+            if not has_csrf and form['method'].upper() == 'POST':
+                issues.append({
+                    'type': 'missing_csrf_protection',
+                    'severity': 'medium',
+                    'description': 'Form without CSRF protection detected',
+                    'form_action': form['action']
+                })
+
+        inline_scripts = [s for s in page_info.get('scripts', []) if s['type'] == 'inline']
+        if inline_scripts:
+            issues.append({
+                'type': 'inline_javascript',
+                'severity': 'low',
+                'description': f'Found {len(inline_scripts)} inline JavaScript blocks',
+                'count': len(inline_scripts)
+            })
+
+        return {
+            'total_issues': len(issues),
+            'issues': issues,
+            'security_score': max(0, 100 - (len(issues) * 10))
+        }
+
 
 _browser_agent = BrowserAgent()
 

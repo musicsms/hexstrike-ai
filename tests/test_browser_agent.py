@@ -270,3 +270,49 @@ def test_get_console_errors_empty_on_exception():
             pass
     _browser_agent.driver = _RaisingDriver()
     assert _browser_agent._get_console_errors() == []
+
+
+def test_analyze_page_security_flags_sensitive_storage_data():
+    page_info = {
+        "local_storage": {"auth_token": "secret123"},
+        "session_storage": {},
+        "forms": [],
+        "scripts": [],
+    }
+    result = _browser_agent._analyze_page_security("<html></html>", page_info)
+    issue_types = {i["type"] for i in result["issues"]}
+    assert "sensitive_data_storage" in issue_types
+
+
+def test_analyze_page_security_flags_post_form_without_csrf():
+    page_info = {
+        "local_storage": {}, "session_storage": {},
+        "forms": [{"action": "/login", "method": "POST", "inputs": [{"name": "username", "type": "text", "value": ""}]}],
+        "scripts": [],
+    }
+    result = _browser_agent._analyze_page_security("<html></html>", page_info)
+    issue_types = {i["type"] for i in result["issues"]}
+    assert "missing_csrf_protection" in issue_types
+
+
+def test_analyze_page_security_no_csrf_flag_when_csrf_field_present():
+    page_info = {
+        "local_storage": {}, "session_storage": {},
+        "forms": [{"action": "/login", "method": "POST", "inputs": [{"name": "csrf_token", "type": "hidden", "value": "x"}]}],
+        "scripts": [],
+    }
+    result = _browser_agent._analyze_page_security("<html></html>", page_info)
+    issue_types = {i["type"] for i in result["issues"]}
+    assert "missing_csrf_protection" not in issue_types
+
+
+def test_analyze_page_security_counts_inline_scripts_and_scores():
+    page_info = {
+        "local_storage": {}, "session_storage": {}, "forms": [],
+        "scripts": [{"type": "inline", "content": "x"}, {"type": "inline", "content": "y"}, {"type": "external", "src": "/a.js"}],
+    }
+    result = _browser_agent._analyze_page_security("<html></html>", page_info)
+    inline_issue = next(i for i in result["issues"] if i["type"] == "inline_javascript")
+    assert inline_issue["count"] == 2
+    assert result["total_issues"] == 1
+    assert result["security_score"] == 90
