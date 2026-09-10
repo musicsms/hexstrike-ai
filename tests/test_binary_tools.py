@@ -186,12 +186,205 @@ def test_one_gadget_find_handler_invocation(monkeypatch):
     assert captured["cmd"] == ["one_gadget", "/tmp/libc.so.6", "--level", "2", "--raw"]
 
 
-def test_binary_category_has_11_tools():
+def test_pwntools_exploit_handler_invocation_script_content(monkeypatch):
+    captured = _mock_execute(monkeypatch)
+    tool = ToolRegistry.get("pwntools_exploit")
+    assert tool is not None
+    assert tool.category == "binary"
+    assert tool.endpoint == "/api/tools/pwntools"
+
+    res = tool.handler(script_content="print('hi')", additional_args="-v")
+    assert res["success"] is True
+    assert captured["cmd"] == ["python3", "/tmp/pwntools_exploit.py", "-v"]
+    assert Path("/tmp/pwntools_exploit.py").exists() is False
+
+
+def test_pwntools_exploit_handler_invocation_generated_template(monkeypatch):
+    written = {}
+    original_write_text = Path.write_text
+
+    def capture_write_text(self, content, *a, **kw):
+        if str(self) == "/tmp/pwntools_exploit.py":
+            written["content"] = content
+        return original_write_text(self, content, *a, **kw)
+
+    monkeypatch.setattr(Path, "write_text", capture_write_text)
+    captured = _mock_execute(monkeypatch)
+    tool = ToolRegistry.get("pwntools_exploit")
+
+    res = tool.handler(target_binary="/tmp/exploit")
+    assert res["success"] is True
+    assert captured["cmd"] == ["python3", "/tmp/pwntools_exploit.py"]
+
+    target_binary, target_host, target_port = "/tmp/exploit", "", 0
+    expected = f"""#!/usr/bin/env python3
+from pwn import *
+
+# Configuration
+context.arch = 'amd64'
+context.os = 'linux'
+context.log_level = 'info'
+
+# Target configuration
+binary = '{target_binary}' if '{target_binary}' else None
+host = '{target_host}' if '{target_host}' else None
+port = {target_port} if {target_port} else None
+
+# Exploit logic
+if binary:
+    p = process(binary)
+    log.info(f"Started local process: {{binary}}")
+elif host and port:
+    p = remote(host, port)
+    log.info(f"Connected to {{host}}:{{port}}")
+else:
+    log.error("No target specified")
+    exit(1)
+
+# Basic interaction
+p.interactive()
+"""
+    assert written["content"] == expected
+
+
+def test_angr_analyze_handler_invocation_symbolic(monkeypatch):
+    written = {}
+    original_write_text = Path.write_text
+
+    def capture_write_text(self, content, *a, **kw):
+        if str(self) == "/tmp/angr_analysis.py":
+            written["content"] = content
+        return original_write_text(self, content, *a, **kw)
+
+    monkeypatch.setattr(Path, "write_text", capture_write_text)
+
+    captured = {}
+
+    def fake_execute(cmd, **kwargs):
+        captured["cmd"] = cmd
+        captured["kwargs"] = kwargs
+        return {"success": True, "command": " ".join(cmd), "output": "", "cached": False}
+
+    monkeypatch.setattr("hexstrike.tools.base.is_tool_available", lambda name: True)
+    monkeypatch.setattr(default_process_manager, "execute_command", fake_execute)
+
+    tool = ToolRegistry.get("angr_analyze")
+    assert tool is not None
+    assert tool.endpoint == "/api/tools/angr"
+
+    res = tool.handler(binary="/tmp/target", find_address="0x401000", avoid_addresses="0x402000,0x403000")
+    assert res["success"] is True
+    assert captured["cmd"] == ["python3", "/tmp/angr_analysis.py"]
+    assert captured["kwargs"]["timeout"] == 600
+
+    binary = "/tmp/target"
+    base = f"""#!/usr/bin/env python3
+import angr
+import sys
+
+# Load binary
+project = angr.Project('{binary}', auto_load_libs=False)
+print(f"Loaded binary: {binary}")
+print(f"Architecture: {{project.arch}}")
+print(f"Entry point: {{hex(project.entry)}}")
+
+"""
+    find_address, avoid_addresses = "0x401000", "0x402000,0x403000"
+    base += f"""
+# Symbolic execution
+state = project.factory.entry_state()
+simgr = project.factory.simulation_manager(state)
+
+# Find and avoid addresses
+find_addr = {find_address if find_address else 'None'}
+avoid_addrs = {avoid_addresses.split(',') if avoid_addresses else '[]'}
+
+if find_addr:
+    simgr.explore(find=find_addr, avoid=avoid_addrs)
+    if simgr.found:
+        print("Found solution!")
+        solution_state = simgr.found[0]
+        print(f"Input: {{solution_state.posix.dumps(0)}}")
+    else:
+        print("No solution found")
+else:
+    print("No find address specified, running basic analysis")
+"""
+    assert written["content"] == base
+
+
+def test_angr_analyze_handler_invocation_cfg(monkeypatch):
+    written = {}
+    original_write_text = Path.write_text
+
+    def capture_write_text(self, content, *a, **kw):
+        if str(self) == "/tmp/angr_analysis.py":
+            written["content"] = content
+        return original_write_text(self, content, *a, **kw)
+
+    monkeypatch.setattr(Path, "write_text", capture_write_text)
+    captured = _mock_execute(monkeypatch)
+
+    tool = ToolRegistry.get("angr_analyze")
+    res = tool.handler(binary="/tmp/target", analysis_type="cfg")
+    assert res["success"] is True
+
+    binary = "/tmp/target"
+    base = f"""#!/usr/bin/env python3
+import angr
+import sys
+
+# Load binary
+project = angr.Project('{binary}', auto_load_libs=False)
+print(f"Loaded binary: {binary}")
+print(f"Architecture: {{project.arch}}")
+print(f"Entry point: {{hex(project.entry)}}")
+
+"""
+    base += """
+# Control Flow Graph analysis
+cfg = project.analyses.CFGFast()
+print(f"CFG nodes: {len(cfg.graph.nodes())}")
+print(f"CFG edges: {len(cfg.graph.edges())}")
+
+# Function analysis
+for func_addr, func in cfg.functions.items():
+    print(f"Function: {func.name} at {hex(func_addr)}")
+"""
+    assert written["content"] == base
+
+
+def test_gdb_peda_analyze_handler_invocation_with_commands(monkeypatch):
+    captured = _mock_execute(monkeypatch)
+    tool = ToolRegistry.get("gdb_peda_analyze")
+    assert tool is not None
+    assert tool.endpoint == "/api/tools/gdb-peda"
+
+    res = tool.handler(binary="/tmp/target", commands="run\nbt", additional_args="-nx")
+    assert res["success"] is True
+    assert captured["cmd"] == ["gdb", "-q", "/tmp/target", "-x", "/tmp/gdb_peda_commands.txt", "-nx"]
+    assert Path("/tmp/gdb_peda_commands.txt").exists() is False
+
+
+def test_gdb_peda_analyze_handler_invocation_no_commands(monkeypatch):
+    captured = _mock_execute(monkeypatch)
+    tool = ToolRegistry.get("gdb_peda_analyze")
+
+    res = tool.handler(binary="/tmp/target", core_file="/tmp/core", attach_pid=1234)
+    assert res["success"] is True
+    assert captured["cmd"] == [
+        "gdb", "-q", "/tmp/target", "/tmp/core", "-p", "1234",
+        "-ex", "source ~/peda/peda.py", "-ex", "quit",
+    ]
+
+
+def test_binary_category_has_14_tools():
     binary_tools = ToolRegistry.get_by_category("binary")
-    assert len(binary_tools) == 11
+    assert len(binary_tools) == 14
     names = {t.name for t in binary_tools}
     assert names == {
         "radare2_analyze", "gdb_analyze", "ghidra_analyze", "ropgadget_scan",
         "checksec_scan", "xxd_dump", "strings_scan", "objdump_scan",
         "ropper_scan", "pwninit_setup", "one_gadget_find",
+        "pwntools_exploit", "angr_analyze", "gdb_peda_analyze",
     }

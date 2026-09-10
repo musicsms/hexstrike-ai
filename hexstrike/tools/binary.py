@@ -179,3 +179,151 @@ def one_gadget_find(libc_path: str, level: int = 1, additional_args: Optional[st
     if additional_args:
         cmd.extend(additional_args.split())
     return run_tool_command(cmd)
+
+@ToolRegistry.register(
+    name="pwntools_exploit",
+    category="binary",
+    description="Exploit development and automation using Pwntools",
+    endpoint="/api/tools/pwntools"
+)
+def pwntools_exploit(script_content: Optional[str] = None, target_binary: str = "", target_host: str = "", target_port: int = 0, exploit_type: str = "local", additional_args: Optional[str] = None) -> Dict[str, Any]:
+    script_file = "/tmp/pwntools_exploit.py"
+    if script_content:
+        Path(script_file).write_text(script_content)
+    else:
+        template = f"""#!/usr/bin/env python3
+from pwn import *
+
+# Configuration
+context.arch = 'amd64'
+context.os = 'linux'
+context.log_level = 'info'
+
+# Target configuration
+binary = '{target_binary}' if '{target_binary}' else None
+host = '{target_host}' if '{target_host}' else None
+port = {target_port} if {target_port} else None
+
+# Exploit logic
+if binary:
+    p = process(binary)
+    log.info(f"Started local process: {{binary}}")
+elif host and port:
+    p = remote(host, port)
+    log.info(f"Connected to {{host}}:{{port}}")
+else:
+    log.error("No target specified")
+    exit(1)
+
+# Basic interaction
+p.interactive()
+"""
+        Path(script_file).write_text(template)
+    cmd = ["python3", script_file]
+    if additional_args:
+        cmd.extend(additional_args.split())
+    result = run_tool_command(cmd)
+    try:
+        Path(script_file).unlink()
+    except OSError:
+        pass
+    return result
+
+@ToolRegistry.register(
+    name="angr_analyze",
+    category="binary",
+    description="Symbolic execution and binary analysis using angr",
+    endpoint="/api/tools/angr"
+)
+def angr_analyze(binary: str, script_content: Optional[str] = None, find_address: Optional[str] = None, avoid_addresses: Optional[str] = None, analysis_type: str = "symbolic", additional_args: Optional[str] = None) -> Dict[str, Any]:
+    script_file = "/tmp/angr_analysis.py"
+    if script_content:
+        Path(script_file).write_text(script_content)
+    else:
+        template = f"""#!/usr/bin/env python3
+import angr
+import sys
+
+# Load binary
+project = angr.Project('{binary}', auto_load_libs=False)
+print(f"Loaded binary: {binary}")
+print(f"Architecture: {{project.arch}}")
+print(f"Entry point: {{hex(project.entry)}}")
+
+"""
+        if analysis_type == "symbolic":
+            template += f"""
+# Symbolic execution
+state = project.factory.entry_state()
+simgr = project.factory.simulation_manager(state)
+
+# Find and avoid addresses
+find_addr = {find_address if find_address else 'None'}
+avoid_addrs = {avoid_addresses.split(',') if avoid_addresses else '[]'}
+
+if find_addr:
+    simgr.explore(find=find_addr, avoid=avoid_addrs)
+    if simgr.found:
+        print("Found solution!")
+        solution_state = simgr.found[0]
+        print(f"Input: {{solution_state.posix.dumps(0)}}")
+    else:
+        print("No solution found")
+else:
+    print("No find address specified, running basic analysis")
+"""
+        elif analysis_type == "cfg":
+            template += """
+# Control Flow Graph analysis
+cfg = project.analyses.CFGFast()
+print(f"CFG nodes: {len(cfg.graph.nodes())}")
+print(f"CFG edges: {len(cfg.graph.edges())}")
+
+# Function analysis
+for func_addr, func in cfg.functions.items():
+    print(f"Function: {func.name} at {hex(func_addr)}")
+"""
+        Path(script_file).write_text(template)
+    cmd = ["python3", script_file]
+    if additional_args:
+        cmd.extend(additional_args.split())
+    result = run_tool_command(cmd, timeout=600)
+    try:
+        Path(script_file).unlink()
+    except OSError:
+        pass
+    return result
+
+@ToolRegistry.register(
+    name="gdb_peda_analyze",
+    category="binary",
+    description="Enhanced debugging and exploitation using GDB with PEDA",
+    endpoint="/api/tools/gdb-peda"
+)
+def gdb_peda_analyze(binary: Optional[str] = None, commands: Optional[str] = None, attach_pid: int = 0, core_file: Optional[str] = None, additional_args: Optional[str] = None) -> Dict[str, Any]:
+    cmd = ["gdb", "-q"]
+    if binary:
+        cmd.append(binary)
+    if core_file:
+        cmd.append(core_file)
+    if attach_pid:
+        cmd.extend(["-p", str(attach_pid)])
+    if commands:
+        peda_commands = f"""
+source ~/peda/peda.py
+{commands}
+quit
+"""
+        Path("/tmp/gdb_peda_commands.txt").write_text(peda_commands)
+        cmd.extend(["-x", "/tmp/gdb_peda_commands.txt"])
+    else:
+        cmd.extend(["-ex", "source ~/peda/peda.py", "-ex", "quit"])
+    if additional_args:
+        cmd.extend(additional_args.split())
+    result = run_tool_command(cmd)
+    if commands and Path("/tmp/gdb_peda_commands.txt").exists():
+        try:
+            Path("/tmp/gdb_peda_commands.txt").unlink()
+        except OSError:
+            pass
+    return result
