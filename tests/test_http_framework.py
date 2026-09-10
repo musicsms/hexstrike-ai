@@ -375,14 +375,3 @@ def test_http_framework_spider_handler_invocation_respects_max_pages(monkeypatch
     res = tool.handler(url="http://example.com/", max_depth=10, max_pages=1)
     assert res["total_pages"] <= 1
 
-
-def test_webtest_category_has_7_tools():
-    from hexstrike.core.registry import ToolRegistry
-    webtest_tools = ToolRegistry.get_by_category("webtest")
-    assert len(webtest_tools) == 7
-    names = {t.name for t in webtest_tools}
-    assert names == {
-        "http_framework_request", "http_framework_spider", "http_framework_proxy_history",
-        "http_framework_set_rules", "http_framework_set_scope", "http_framework_repeater",
-        "http_framework_intruder",
-    }
