@@ -1,6 +1,8 @@
 from typing import Dict, Any, List, Optional
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.common.by import By
+import json
 from hexstrike.core.registry import ToolRegistry
 
 
@@ -49,6 +51,127 @@ class BrowserAgent:
         if self.driver:
             self.driver.quit()
             self.driver = None
+
+    def _get_console_errors(self) -> list:
+        try:
+            logs = self.driver.get_log('browser')
+            out = []
+            for entry in logs[-100:]:
+                lvl = entry.get('level', '')
+                if lvl in ('SEVERE', 'WARNING'):
+                    out.append({'level': lvl, 'message': entry.get('message', '')[:500]})
+            return out
+        except Exception:
+            return []
+
+    def _get_local_storage(self) -> dict:
+        try:
+            return self.driver.execute_script("""
+                var storage = {};
+                for (var i = 0; i < localStorage.length; i++) {
+                    var key = localStorage.key(i);
+                    storage[key] = localStorage.getItem(key);
+                }
+                return storage;
+            """)
+        except Exception:
+            return {}
+
+    def _get_session_storage(self) -> dict:
+        try:
+            return self.driver.execute_script("""
+                var storage = {};
+                for (var i = 0; i < sessionStorage.length; i++) {
+                    var key = sessionStorage.key(i);
+                    storage[key] = sessionStorage.getItem(key);
+                }
+                return storage;
+            """)
+        except Exception:
+            return {}
+
+    def _extract_forms(self) -> list:
+        forms = []
+        try:
+            form_elements = self.driver.find_elements(By.TAG_NAME, 'form')
+            for form in form_elements:
+                form_data = {
+                    'action': form.get_attribute('action') or '',
+                    'method': form.get_attribute('method') or 'GET',
+                    'inputs': []
+                }
+                inputs = form.find_elements(By.TAG_NAME, 'input')
+                for input_elem in inputs:
+                    form_data['inputs'].append({
+                        'name': input_elem.get_attribute('name') or '',
+                        'type': input_elem.get_attribute('type') or 'text',
+                        'value': input_elem.get_attribute('value') or ''
+                    })
+                forms.append(form_data)
+        except Exception:
+            pass
+        return forms
+
+    def _extract_links(self) -> list:
+        links = []
+        try:
+            link_elements = self.driver.find_elements(By.TAG_NAME, 'a')
+            for link in link_elements[:50]:
+                href = link.get_attribute('href')
+                if href:
+                    links.append({'href': href, 'text': link.text[:100]})
+        except Exception:
+            pass
+        return links
+
+    def _extract_inputs(self) -> list:
+        inputs = []
+        try:
+            input_elements = self.driver.find_elements(By.TAG_NAME, 'input')
+            for input_elem in input_elements:
+                inputs.append({
+                    'name': input_elem.get_attribute('name') or '',
+                    'type': input_elem.get_attribute('type') or 'text',
+                    'id': input_elem.get_attribute('id') or '',
+                    'placeholder': input_elem.get_attribute('placeholder') or ''
+                })
+        except Exception:
+            pass
+        return inputs
+
+    def _extract_scripts(self) -> list:
+        scripts = []
+        try:
+            script_elements = self.driver.find_elements(By.TAG_NAME, 'script')
+            for script in script_elements[:20]:
+                src = script.get_attribute('src')
+                if src:
+                    scripts.append({'type': 'external', 'src': src})
+                else:
+                    content = script.get_attribute('innerHTML')
+                    if content and len(content) > 10:
+                        scripts.append({'type': 'inline', 'content': content[:1000]})
+        except Exception:
+            pass
+        return scripts
+
+    def _get_network_logs(self) -> list:
+        try:
+            logs = self.driver.get_log('performance')
+            network_requests = []
+            for log in logs[-50:]:
+                message = json.loads(log['message'])
+                if message['message']['method'] == 'Network.responseReceived':
+                    response = message['message']['params']['response']
+                    network_requests.append({
+                        'url': response['url'],
+                        'status': response['status'],
+                        'mimeType': response['mimeType'],
+                        'headers': response.get('headers', {})
+                    })
+            return network_requests
+        except Exception:
+            return []
 
 
 _browser_agent = BrowserAgent()

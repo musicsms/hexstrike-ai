@@ -126,3 +126,147 @@ def test_reset_clears_state_and_closes_browser():
     assert _browser_agent.screenshots == []
     assert _browser_agent.page_sources == []
     assert _browser_agent.network_logs == []
+
+
+class _FakeElement:
+    def __init__(self, attrs=None, text=""):
+        self._attrs = attrs or {}
+        self.text = text
+
+    def get_attribute(self, name):
+        return self._attrs.get(name)
+
+
+class _FakeDriverWithElements:
+    def __init__(self, elements_by_tag=None, script_results=None, logs=None):
+        self._elements_by_tag = elements_by_tag or {}
+        self._script_results = script_results or {}
+        self._logs = logs or {}
+
+    def find_elements(self, by, tag):
+        return self._elements_by_tag.get(tag, [])
+
+    def execute_script(self, script):
+        for key, value in self._script_results.items():
+            if key in script:
+                return value
+        raise Exception("unrecognized script")
+
+    def get_log(self, log_type):
+        return self._logs.get(log_type, [])
+
+    def quit(self):
+        pass
+
+
+def test_get_local_storage_returns_script_result():
+    _browser_agent.driver = _FakeDriverWithElements(script_results={"localStorage": {"token": "abc"}})
+    assert _browser_agent._get_local_storage() == {"token": "abc"}
+
+
+def test_get_local_storage_returns_empty_on_exception():
+    class _RaisingDriver:
+        def execute_script(self, script):
+            raise Exception("boom")
+        def quit(self):
+            pass
+    _browser_agent.driver = _RaisingDriver()
+    assert _browser_agent._get_local_storage() == {}
+
+
+def test_get_session_storage_returns_script_result():
+    _browser_agent.driver = _FakeDriverWithElements(script_results={"sessionStorage": {"csrf": "xyz"}})
+    assert _browser_agent._get_session_storage() == {"csrf": "xyz"}
+
+
+def test_extract_forms_from_elements():
+    form_elem = _FakeElement(attrs={"action": "/submit", "method": "POST"})
+    input_elem = _FakeElement(attrs={"name": "username", "type": "text", "value": ""})
+    form_elem.find_elements = lambda by, tag: [input_elem]
+
+    class _DriverWithForms(_FakeDriverWithElements):
+        def find_elements(self, by, tag):
+            if tag == "form":
+                return [form_elem]
+            if tag == "input":
+                return [input_elem]
+            return []
+
+    _browser_agent.driver = _DriverWithForms()
+    forms = _browser_agent._extract_forms()
+    assert forms == [{"action": "/submit", "method": "POST", "inputs": [{"name": "username", "type": "text", "value": ""}]}]
+
+
+def test_extract_links_limits_to_50():
+    links = [_FakeElement(attrs={"href": f"http://example.com/{i}"}, text=f"link{i}") for i in range(60)]
+    _browser_agent.driver = _FakeDriverWithElements(elements_by_tag={"a": links})
+    result = _browser_agent._extract_links()
+    assert len(result) == 50
+    assert result[0] == {"href": "http://example.com/0", "text": "link0"}
+
+
+def test_extract_links_skips_missing_href():
+    links = [_FakeElement(attrs={}, text="no href"), _FakeElement(attrs={"href": "http://x.com"}, text="ok")]
+    _browser_agent.driver = _FakeDriverWithElements(elements_by_tag={"a": links})
+    result = _browser_agent._extract_links()
+    assert result == [{"href": "http://x.com", "text": "ok"}]
+
+
+def test_extract_inputs_from_elements():
+    inputs = [_FakeElement(attrs={"name": "q", "type": "search", "id": "search-box", "placeholder": "Search..."})]
+    _browser_agent.driver = _FakeDriverWithElements(elements_by_tag={"input": inputs})
+    result = _browser_agent._extract_inputs()
+    assert result == [{"name": "q", "type": "search", "id": "search-box", "placeholder": "Search..."}]
+
+
+def test_extract_scripts_external_and_inline():
+    external = _FakeElement(attrs={"src": "/app.js"})
+    inline = _FakeElement(attrs={"innerHTML": "var x = 'a very long inline script body here';"})
+    _browser_agent.driver = _FakeDriverWithElements(elements_by_tag={"script": [external, inline]})
+    result = _browser_agent._extract_scripts()
+    assert {"type": "external", "src": "/app.js"} in result
+    assert any(s["type"] == "inline" for s in result)
+
+
+def test_get_network_logs_parses_performance_entries():
+    import json
+    perf_log = {"message": json.dumps({
+        "message": {
+            "method": "Network.responseReceived",
+            "params": {"response": {"url": "http://x.com/api", "status": 200, "mimeType": "application/json", "headers": {}}}
+        }
+    })}
+    _browser_agent.driver = _FakeDriverWithElements(logs={"performance": [perf_log]})
+    result = _browser_agent._get_network_logs()
+    assert result == [{"url": "http://x.com/api", "status": 200, "mimeType": "application/json", "headers": {}}]
+
+
+def test_get_network_logs_empty_on_exception():
+    class _RaisingDriver:
+        def get_log(self, log_type):
+            raise Exception("no logs")
+        def quit(self):
+            pass
+    _browser_agent.driver = _RaisingDriver()
+    assert _browser_agent._get_network_logs() == []
+
+
+def test_get_console_errors_filters_severe_and_warning():
+    logs = [
+        {"level": "SEVERE", "message": "uncaught error"},
+        {"level": "INFO", "message": "just info"},
+        {"level": "WARNING", "message": "a warning"},
+    ]
+    _browser_agent.driver = _FakeDriverWithElements(logs={"browser": logs})
+    result = _browser_agent._get_console_errors()
+    assert result == [{"level": "SEVERE", "message": "uncaught error"}, {"level": "WARNING", "message": "a warning"}]
+
+
+def test_get_console_errors_empty_on_exception():
+    class _RaisingDriver:
+        def get_log(self, log_type):
+            raise Exception("no logs")
+        def quit(self):
+            pass
+    _browser_agent.driver = _RaisingDriver()
+    assert _browser_agent._get_console_errors() == []
