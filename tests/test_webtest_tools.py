@@ -167,3 +167,17 @@ def test_burpsuite_alternative_scan_exception_returns_error(monkeypatch):
     tool = ToolRegistry.get("burpsuite_alternative_scan")
     res = tool.handler(target="http://example.com/", scan_type="active")
     assert res == {"success": False, "error": "boom"}
+
+
+def test_webtest_category_has_12_tools():
+    from hexstrike.core.registry import ToolRegistry
+    webtest_tools = ToolRegistry.get_by_category("webtest")
+    assert len(webtest_tools) == 12
+    names = {t.name for t in webtest_tools}
+    assert names == {
+        "http_framework_request", "http_framework_spider", "http_framework_proxy_history",
+        "http_framework_set_rules", "http_framework_set_scope", "http_framework_repeater",
+        "http_framework_intruder",
+        "browser_navigate", "browser_screenshot", "browser_close", "browser_status",
+        "burpsuite_alternative_scan",
+    }
