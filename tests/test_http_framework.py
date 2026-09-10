@@ -54,3 +54,59 @@ def test_reset_clears_all_mutable_state():
     assert _http_framework.match_replace_rules == []
     assert _http_framework.scope is None
     assert _http_framework._req_id == 0
+
+
+def test_in_scope_no_scope_set_allows_everything():
+    assert _http_framework._in_scope("http://anything.example.org/") is True
+
+
+def test_in_scope_exact_host_match():
+    _http_framework.set_scope("example.com", include_subdomains=False)
+    assert _http_framework._in_scope("http://example.com/path") is True
+    assert _http_framework._in_scope("http://other.com/path") is False
+
+
+def test_in_scope_subdomain_match():
+    _http_framework.set_scope("example.com", include_subdomains=True)
+    assert _http_framework._in_scope("http://api.example.com/path") is True
+    _http_framework.set_scope("example.com", include_subdomains=False)
+    assert _http_framework._in_scope("http://api.example.com/path") is False
+
+
+def test_apply_match_replace_url_rule():
+    _http_framework.set_match_replace_rules([{"where": "url", "pattern": "http://", "replacement": "https://"}])
+    url, data, headers = _http_framework._apply_match_replace("http://example.com/", {}, {})
+    assert url == "https://example.com/"
+
+
+def test_apply_match_replace_query_rule():
+    _http_framework.set_match_replace_rules([{"where": "query", "pattern": "old", "replacement": "new"}])
+    url, data, headers = _http_framework._apply_match_replace("http://example.com/?old=old_value", {}, {})
+    assert url == "http://example.com/?new=new_value"
+
+
+def test_apply_match_replace_headers_rule():
+    _http_framework.set_match_replace_rules([{"where": "headers", "pattern": "SECRET", "replacement": "REDACTED"}])
+    url, data, headers = _http_framework._apply_match_replace("http://example.com/", {}, {"X-SECRET": "value"})
+    assert headers == {"X-REDACTED": "value"}
+
+
+def test_apply_match_replace_body_dict_rule():
+    _http_framework.set_match_replace_rules([{"where": "body", "pattern": "foo", "replacement": "bar"}])
+    url, data, headers = _http_framework._apply_match_replace("http://example.com/", {"foo": "foo_val"}, {})
+    assert data == {"bar": "bar_val"}
+
+
+def test_apply_match_replace_body_string_rule():
+    _http_framework.set_match_replace_rules([{"where": "body", "pattern": "foo", "replacement": "bar"}])
+    url, data, headers = _http_framework._apply_match_replace("http://example.com/", "foo=1", {})
+    assert data == "bar=1"
+
+
+def test_apply_match_replace_out_of_scope_reverts_to_original():
+    _http_framework.set_scope("allowed.com", include_subdomains=False)
+    _http_framework.set_match_replace_rules([{"where": "url", "pattern": "allowed.com", "replacement": "blocked.com"}])
+    url, data, headers = _http_framework._apply_match_replace("http://allowed.com/", {"a": 1}, {"h": "v"})
+    assert url == "http://allowed.com/"
+    assert data == {"a": 1}
+    assert headers == {"h": "v"}
