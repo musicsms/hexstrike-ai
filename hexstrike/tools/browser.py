@@ -400,3 +400,22 @@ def browser_navigate(url: str, headless: bool = True, wait_time: int = 5, proxy_
         active_results = _browser_agent.run_active_tests(result.get("page_info", {}))
         result["active_tests"] = active_results
     return result
+
+
+@ToolRegistry.register(
+    name="browser_screenshot",
+    category="webtest",
+    description="Capture a screenshot of the current page in the active browser session",
+    endpoint="/api/tools/browser-agent/screenshot"
+)
+def browser_screenshot() -> Dict[str, Any]:
+    if not _browser_agent.driver:
+        return {"error": "Browser not initialized. Use navigate action first."}
+    screenshot_path = f"/tmp/hexstrike_screenshot_{int(time.time())}.png"
+    _browser_agent.driver.save_screenshot(screenshot_path)
+    return {
+        "success": True,
+        "screenshot": screenshot_path,
+        "current_url": _browser_agent.driver.current_url,
+        "timestamp": datetime.now().isoformat(),
+    }

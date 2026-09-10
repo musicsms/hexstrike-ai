@@ -560,3 +560,35 @@ def test_browser_navigate_handler_invocation_with_active_tests(monkeypatch):
     tool = ToolRegistry.get("browser_navigate")
     res = tool.handler(url="http://example.com", active_tests=True)
     assert res["active_tests"]["tested_forms"] == 1
+
+
+def test_browser_screenshot_handler_invocation_no_driver():
+    _browser_agent.driver = None
+    tool = ToolRegistry.get("browser_screenshot")
+    assert tool is not None
+    assert tool.endpoint == "/api/tools/browser-agent/screenshot"
+
+    res = tool.handler()
+    assert res == {"error": "Browser not initialized. Use navigate action first."}
+
+
+def test_browser_screenshot_handler_invocation_with_driver():
+    class _FakeDriverForScreenshot:
+        current_url = "http://example.com/page"
+
+        def save_screenshot(self, path):
+            self.saved_path = path
+
+        def quit(self):
+            pass
+
+    fake = _FakeDriverForScreenshot()
+    _browser_agent.driver = fake
+
+    tool = ToolRegistry.get("browser_screenshot")
+    res = tool.handler()
+    assert res["success"] is True
+    assert res["screenshot"].startswith("/tmp/hexstrike_screenshot_")
+    assert res["current_url"] == "http://example.com/page"
+    assert fake.saved_path == res["screenshot"]
+    assert _browser_agent.screenshots == []  # not tracked, matching legacy
