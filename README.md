@@ -46,7 +46,7 @@
 
 ## Architecture Overview
 
-HexStrike AI MCP v6.0 features a multi-agent architecture with autonomous AI agents, intelligent decision-making, and vulnerability intelligence.
+HexStrike AI ships as the `hexstrike/` Python package: a modular tool registry sitting behind two thin entrypoints (a Flask API and an MCP server), so every security tool is defined once and exposed identically over HTTP and MCP.
 
 ```mermaid
 %%{init: {"themeVariables": {
@@ -61,52 +61,76 @@ HexStrike AI MCP v6.0 features a multi-agent architecture with autonomous AI age
   "nodeTextColor": "#fffde7"
 }}}%%
 graph TD
-    A[AI Agent - Claude/GPT/Copilot] -->|MCP Protocol| B[HexStrike MCP Server v6.0]
-    
-    B --> C[Intelligent Decision Engine]
-    B --> D[12+ Autonomous AI Agents]
-    B --> E[Modern Visual Engine]
-    
-    C --> F[Tool Selection AI]
-    C --> G[Parameter Optimization]
-    C --> H[Attack Chain Discovery]
-    
-    D --> I[BugBounty Agent]
-    D --> J[CTF Solver Agent]
-    D --> K[CVE Intelligence Agent]
-    D --> L[Exploit Generator Agent]
-    
-    E --> M[Real-time Dashboards]
-    E --> N[Progress Visualization]
-    E --> O[Vulnerability Cards]
-    
-    B --> P[150+ Security Tools]
-    P --> Q[Network Tools - 25+]
-    P --> R[Web App Tools - 40+]
-    P --> S[Cloud Tools - 20+]
-    P --> T[Binary Tools - 25+]
-    P --> U[CTF Tools - 20+]
-    P --> V[OSINT Tools - 20+]
-    
-    B --> W[Advanced Process Management]
-    W --> X[Smart Caching]
-    W --> Y[Resource Optimization]
-    W --> Z[Error Recovery]
-    
+    A[AI Agent - Claude/GPT/Copilot] -->|MCP Protocol| B[hexstrike_mcp.py]
+    B --> C[hexstrike/mcp/server.py]
+    C -->|HTTP| D[hexstrike_server.py]
+    D --> E[hexstrike/api/app.py - Flask]
+
+    E --> F[hexstrike/core/registry.py - ToolRegistry]
+    F --> G["@ToolRegistry.register()"]
+    G --> H[hexstrike/tools/*.py]
+
+    H --> I[web.py - 30 tools]
+    H --> J[network.py - 16 tools]
+    H --> K[binary.py - 15 tools]
+    H --> L[cloud.py - 12 tools]
+    H --> M[webtest.py - 12 tools]
+    H --> N[forensics.py, password.py, exploitation.py, osint.py]
+
+    E --> O[hexstrike/core/process.py]
+    E --> P[hexstrike/core/visual.py]
+    E --> Q[hexstrike/agents/]
+
     style A fill:#b71c1c,stroke:#ff5252,stroke-width:3px,color:#fffde7
-    style B fill:#ff5252,stroke:#b71c1c,stroke-width:4px,color:#fffde7
-    style C fill:#ff8a80,stroke:#b71c1c,stroke-width:2px,color:#fffde7
-    style D fill:#ff8a80,stroke:#b71c1c,stroke-width:2px,color:#fffde7
-    style E fill:#ff8a80,stroke:#b71c1c,stroke-width:2px,color:#fffde7
+    style B fill:#ff5252,stroke:#b71c1c,stroke-width:3px,color:#fffde7
+    style C fill:#ff5252,stroke:#b71c1c,stroke-width:3px,color:#fffde7
+    style D fill:#ff5252,stroke:#b71c1c,stroke-width:3px,color:#fffde7
+    style E fill:#ff5252,stroke:#b71c1c,stroke-width:4px,color:#fffde7
+    style F fill:#ff8a80,stroke:#b71c1c,stroke-width:2px,color:#fffde7
 ```
 
 ### How It Works
 
-1. **AI Agent Connection** - Claude, GPT, or other MCP-compatible agents connect via FastMCP protocol
-2. **Intelligent Analysis** - Decision engine analyzes targets and selects optimal testing strategies
-3. **Autonomous Execution** - AI agents execute comprehensive security assessments
-4. **Real-time Adaptation** - System adapts based on results and discovered vulnerabilities
-5. **Advanced Reporting** - Visual output with vulnerability cards and risk analysis
+1. **Registration** - every tool is a plain function decorated with `@ToolRegistry.register(name, category, description, endpoint)` in one of the `hexstrike/tools/*.py` modules. Registering it is the only step needed to expose it — no manual wiring elsewhere.
+2. **HTTP exposure** - `hexstrike/api/app.py` iterates `ToolRegistry.get_all_tools()` at startup and mounts one Flask route per tool at its registered `endpoint`.
+3. **MCP exposure** - `hexstrike/mcp/server.py` iterates the same registry and registers one `FastMCP` tool per entry, forwarding calls back to the Flask API over HTTP via `hexstrike/mcp/client.py`.
+4. **Single source of truth** - because both surfaces read from the same `ToolRegistry`, a tool's name, description, and parameters can never drift between the HTTP API and the MCP server.
+5. **Entrypoints stay thin** - `hexstrike_server.py` and `hexstrike_mcp.py` at the repo root are small backward-compatible launchers (`create_app()` / `main()`); all real logic lives inside the `hexstrike/` package.
+
+### Project Structure
+
+```
+hexstrike/
+├── core/
+│   ├── registry.py      # ToolRegistry / ToolSpec - the tool decorator and lookup table
+│   ├── config.py         # Shared configuration and defaults
+│   ├── process.py        # Process management (list/status/terminate running tool commands)
+│   └── visual.py          # Real-time dashboard / progress visualization
+├── tools/                  # One module per tool category, all self-registering
+│   ├── web.py             # Web app security tools (30)
+│   ├── network.py         # Network recon & scanning tools (16)
+│   ├── binary.py          # Binary analysis / reverse engineering tools (15)
+│   ├── cloud.py           # Cloud & container security tools (12)
+│   ├── webtest.py         # HTTPTestingFramework + BrowserAgent tools (12)
+│   ├── forensics.py       # Memory/file forensics tools (6)
+│   ├── exploitation.py    # Exploit-dev tools (3)
+│   ├── password.py        # Password/hash cracking tools (3)
+│   ├── osint.py           # OSINT/subdomain tools (2)
+│   └── base.py            # Shared `run_tool_command()` helper
+├── api/
+│   ├── app.py              # create_app() - builds the Flask app from the registry
+│   └── routes.py           # Non-tool endpoints (health, telemetry, process management)
+├── mcp/
+│   ├── server.py           # setup_mcp_server()/main() - builds the FastMCP server from the registry
+│   └── client.py           # HTTP client the MCP server uses to call back into the Flask API
+└── agents/
+    └── base_agent.py        # AI planning helpers
+
+hexstrike_server.py   # Thin entrypoint: python3 hexstrike_server.py → create_app()
+hexstrike_mcp.py      # Thin entrypoint: python3 hexstrike_mcp.py → mcp.server.main()
+```
+
+Adding a new tool means writing one decorated function in the matching `hexstrike/tools/*.py` file (or a new module, imported from `hexstrike/tools/__init__.py`) — it becomes available over both HTTP and MCP automatically, with tests living alongside it in `tests/`.
 
 ---
 
