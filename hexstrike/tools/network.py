@@ -5,7 +5,7 @@ from hexstrike.tools.base import run_tool_command
 @ToolRegistry.register(
     name="nmap_scan",
     category="network",
-    description="Scan target host or network using Nmap",
+    description="Scan target host or network using Nmap - most accurate service/OS detection; slower than rustscan_scan/masscan_scan on large port ranges",
     endpoint="/api/tools/nmap"
 )
 def nmap_scan(target: str, scan_type: str = "-sV", ports: Optional[str] = None, additional_args: Optional[str] = None) -> Dict[str, Any]:
@@ -22,7 +22,7 @@ def nmap_scan(target: str, scan_type: str = "-sV", ports: Optional[str] = None, 
 @ToolRegistry.register(
     name="rustscan_scan",
     category="network",
-    description="Fast port scanner using Rustscan",
+    description="Fast port scanner using Rustscan - quick initial port discovery, pair with nmap_scan for service detection",
     endpoint="/api/tools/rustscan"
 )
 def rustscan_scan(target: str, ports: Optional[str] = None, additional_args: Optional[str] = None) -> Dict[str, Any]:
@@ -36,7 +36,7 @@ def rustscan_scan(target: str, ports: Optional[str] = None, additional_args: Opt
 @ToolRegistry.register(
     name="masscan_scan",
     category="network",
-    description="High-speed Internet-scale port scanner using Masscan",
+    description="High-speed Internet-scale port scanner using Masscan - fastest option for huge ranges, less accurate than nmap_scan",
     endpoint="/api/tools/masscan"
 )
 def masscan_scan(target: str, ports: str = "1-65535", rate: int = 1000, interface: Optional[str] = None, router_mac: Optional[str] = None, source_ip: Optional[str] = None, banners: bool = False, additional_args: Optional[str] = None) -> Dict[str, Any]:
@@ -108,7 +108,7 @@ def dnsenum_scan(domain: str, dns_server: Optional[str] = None, wordlist: Option
 @ToolRegistry.register(
     name="enum4linux_scan",
     category="network",
-    description="SMB/Windows enumeration using enum4linux",
+    description="SMB/Windows enumeration using enum4linux - classic broad enumeration (users, shares, policy); prefer enum4linux_ng_scan for a more reliable modern rewrite",
     endpoint="/api/tools/enum4linux"
 )
 def enum4linux_scan(target: str, additional_args: str = "-a") -> Dict[str, Any]:
@@ -118,7 +118,7 @@ def enum4linux_scan(target: str, additional_args: str = "-a") -> Dict[str, Any]:
 @ToolRegistry.register(
     name="enum4linux_ng_scan",
     category="network",
-    description="Advanced SMB enumeration using enum4linux-ng",
+    description="Advanced SMB enumeration using enum4linux-ng - actively maintained rewrite of enum4linux with more reliable output",
     endpoint="/api/tools/enum4linux-ng"
 )
 def enum4linux_ng_scan(target: str, username: Optional[str] = None, password: Optional[str] = None, domain: Optional[str] = None, shares: bool = True, users: bool = True, groups: bool = True, policy: bool = True, additional_args: Optional[str] = None) -> Dict[str, Any]:
@@ -161,7 +161,7 @@ def fierce_scan(domain: str, dns_server: Optional[str] = None, additional_args: 
 @ToolRegistry.register(
     name="nbtscan_scan",
     category="network",
-    description="NetBIOS name scanning using nbtscan",
+    description="NetBIOS name scanning using nbtscan - network-range host discovery, not a full enumeration tool",
     endpoint="/api/tools/nbtscan"
 )
 def nbtscan_scan(target: str, verbose: bool = False, timeout: int = 2, additional_args: Optional[str] = None) -> Dict[str, Any]:
@@ -216,7 +216,7 @@ def responder_capture(interface: str = "eth0", analyze: bool = False, wpad: bool
 @ToolRegistry.register(
     name="rpcclient_enum",
     category="network",
-    description="RPC enumeration using rpcclient",
+    description="RPC enumeration using rpcclient - low-level, scriptable RPC calls for targeted manual enumeration",
     endpoint="/api/tools/rpcclient"
 )
 def rpcclient_enum(target: str, username: Optional[str] = None, password: Optional[str] = None, domain: Optional[str] = None, commands: str = "enumdomusers;enumdomgroups;querydominfo", additional_args: Optional[str] = None) -> Dict[str, Any]:
@@ -237,7 +237,7 @@ def rpcclient_enum(target: str, username: Optional[str] = None, password: Option
 @ToolRegistry.register(
     name="smbmap_scan",
     category="network",
-    description="SMB share enumeration using SMBMap",
+    description="SMB share enumeration using SMBMap - focused specifically on share access/permissions rather than full domain enumeration",
     endpoint="/api/tools/smbmap"
 )
 def smbmap_scan(target: str, username: Optional[str] = None, password: Optional[str] = None, domain: Optional[str] = None, additional_args: Optional[str] = None) -> Dict[str, Any]:
@@ -271,7 +271,7 @@ def subfinder_enum(domain: str, silent: bool = True, all_sources: bool = False, 
 @ToolRegistry.register(
     name="nmap_advanced_scan",
     category="network",
-    description="Advanced Nmap scans with custom NSE scripts and optimized timing",
+    description="Advanced Nmap scans with custom NSE scripts and optimized timing - for deep scripted analysis after initial discovery, not a first pass",
     endpoint="/api/tools/nmap-advanced"
 )
 def nmap_advanced_scan(target: str, scan_type: str = "-sS", ports: Optional[str] = None, timing: str = "T4", nse_scripts: Optional[str] = None, os_detection: bool = False, version_detection: bool = False, aggressive: bool = False, stealth: bool = False, additional_args: Optional[str] = None) -> Dict[str, Any]:

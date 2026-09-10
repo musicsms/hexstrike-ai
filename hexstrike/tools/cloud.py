@@ -188,7 +188,7 @@ def clair_scan(image: str, config: str = "/etc/clair/config.yaml", output_format
 @ToolRegistry.register(
     name="checkov_scan",
     category="cloud",
-    description="Infrastructure as code security scanning using Checkov",
+    description="Infrastructure as code security scanning using Checkov - broadest IaC/language coverage (Terraform, CloudFormation, Kubernetes, etc.)",
     endpoint="/api/tools/checkov"
 )
 def checkov_scan(directory: str = ".", framework: Optional[str] = None, check: Optional[str] = None, skip_check: Optional[str] = None, output_format: str = "json", additional_args: Optional[str] = None) -> Dict[str, Any]:
@@ -208,7 +208,7 @@ def checkov_scan(directory: str = ".", framework: Optional[str] = None, check: O
 @ToolRegistry.register(
     name="terrascan_scan",
     category="cloud",
-    description="Infrastructure as code security scanning using Terrascan",
+    description="Infrastructure as code security scanning using Terrascan - OPA-based policy engine, good for custom policy-as-code requirements",
     endpoint="/api/tools/terrascan"
 )
 def terrascan_scan(scan_type: str = "all", iac_dir: str = ".", policy_type: Optional[str] = None, output_format: str = "json", severity: Optional[str] = None, additional_args: Optional[str] = None) -> Dict[str, Any]:

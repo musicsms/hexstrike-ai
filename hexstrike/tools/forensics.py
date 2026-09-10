@@ -79,7 +79,7 @@ def steghide_run(cover_file: str, action: str = "extract", embed_file: Optional[
 @ToolRegistry.register(
     name="volatility_scan",
     category="forensics",
-    description="Memory forensics using Volatility",
+    description="Memory forensics using Volatility - legacy 2.x branch, needed only for older/unsupported profiles",
     endpoint="/api/tools/volatility"
 )
 def volatility_scan(memory_file: str, plugin: str, profile: Optional[str] = None, additional_args: Optional[str] = None) -> Dict[str, Any]:
@@ -94,7 +94,7 @@ def volatility_scan(memory_file: str, plugin: str, profile: Optional[str] = None
 @ToolRegistry.register(
     name="volatility3_scan",
     category="forensics",
-    description="Advanced memory forensics using Volatility 3",
+    description="Advanced memory forensics using Volatility 3 - actively maintained, prefer this unless a legacy profile requires volatility_scan",
     endpoint="/api/tools/volatility3"
 )
 def volatility3_scan(memory_file: str, plugin: str, output_file: Optional[str] = None, additional_args: Optional[str] = None) -> Dict[str, Any]:

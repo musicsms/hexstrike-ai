@@ -22,7 +22,7 @@ def hydra_attack(target: str, service: str, user: Optional[str] = None, wordlist
 @ToolRegistry.register(
     name="hashcat_scan",
     category="password",
-    description="Password hash cracking using Hashcat",
+    description="Password hash cracking using Hashcat - GPU-accelerated, fastest option for supported hash types",
     endpoint="/api/tools/hashcat"
 )
 def hashcat_scan(hash_file: str, hash_type: str, attack_mode: str = "0", wordlist: Optional[str] = "/usr/share/wordlists/rockyou.txt", mask: Optional[str] = None, additional_args: Optional[str] = None) -> Dict[str, Any]:
@@ -38,7 +38,7 @@ def hashcat_scan(hash_file: str, hash_type: str, attack_mode: str = "0", wordlis
 @ToolRegistry.register(
     name="john_scan",
     category="password",
-    description="Password hash cracking using John the Ripper",
+    description="Password hash cracking using John the Ripper - CPU-based, broader legacy format support than Hashcat",
     endpoint="/api/tools/john"
 )
 def john_scan(hash_file: str, wordlist: Optional[str] = "/usr/share/wordlists/rockyou.txt", format: Optional[str] = None, additional_args: Optional[str] = None) -> Dict[str, Any]:
