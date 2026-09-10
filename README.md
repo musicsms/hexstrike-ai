@@ -5,6 +5,7 @@
 # HexStrike AI MCP Agents v6.0
 ### AI-Powered MCP Cybersecurity Automation Platform
 
+[![Tests](https://github.com/musicsms/hexstrike-ai/actions/workflows/tests.yml/badge.svg)](https://github.com/musicsms/hexstrike-ai/actions/workflows/tests.yml)
 [![Python](https://img.shields.io/badge/Python-3.8%2B-blue.svg)](https://www.python.org/)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![Security](https://img.shields.io/badge/Security-Penetration%20Testing-red.svg)](https://github.com/0x4m4/hexstrike-ai)
@@ -234,6 +235,18 @@ curl http://localhost:8888/health
 curl -X POST http://localhost:8888/api/intelligence/analyze-target \
   -H "Content-Type: application/json" \
   -d '{"target": "example.com", "analysis_type": "comprehensive"}'
+```
+
+### Running Tests
+
+The test suite covers the `hexstrike/` package (registry, API routes, MCP server, and every tool module) and runs automatically on every push/PR via [GitHub Actions](.github/workflows/tests.yml).
+
+```bash
+# Install test dependencies (in addition to requirements.txt)
+pip install -r requirements.txt -r requirements-dev.txt
+
+# Run the full suite
+pytest tests/ -v
 ```
 
 ---
