@@ -1,4 +1,5 @@
 import pytest
+import requests
 from hexstrike.core.registry import ToolRegistry
 import hexstrike.tools
 from hexstrike.tools.http_framework import _http_framework
@@ -110,3 +111,114 @@ def test_apply_match_replace_out_of_scope_reverts_to_original():
     assert url == "http://allowed.com/"
     assert data == {"a": 1}
     assert headers == {"h": "v"}
+
+
+class _FakeResponse:
+    def __init__(self, status_code=200, headers=None, text="", elapsed_seconds=0.1):
+        self.status_code = status_code
+        self.headers = headers or {}
+        self.text = text
+        self.content = text.encode()
+
+        class _Elapsed:
+            def total_seconds(_self):
+                return elapsed_seconds
+        self.elapsed = _Elapsed()
+
+        class _Request:
+            def __init__(_self):
+                _self.headers = {}
+        self.request = _Request()
+
+
+def test_intercept_request_success_records_history(monkeypatch):
+    fake_response = _FakeResponse(status_code=200, headers={
+        "X-Frame-Options": "DENY", "X-Content-Type-Options": "nosniff",
+        "X-XSS-Protection": "1", "Strict-Transport-Security": "max-age=1",
+        "Content-Security-Policy": "default-src 'self'",
+    }, text="hello world")
+    monkeypatch.setattr(_http_framework.session, "get", lambda url, params=None, headers=None, timeout=None: fake_response)
+
+    tool = ToolRegistry.get("http_framework_request")
+    assert tool is not None
+    assert tool.category == "webtest"
+    assert tool.endpoint == "/api/tools/http-framework/request"
+
+    res = tool.handler(url="http://example.com/")
+    assert res["success"] is True
+    assert res["response"]["status_code"] == 200
+    assert len(_http_framework.proxy_history) == 1
+    assert _http_framework.proxy_history[0]["response"]["content"] == "hello world"
+
+
+def test_intercept_request_flags_missing_security_headers(monkeypatch):
+    fake_response = _FakeResponse(status_code=200, headers={}, text="hello")
+    monkeypatch.setattr(_http_framework.session, "get", lambda url, params=None, headers=None, timeout=None: fake_response)
+
+    tool = ToolRegistry.get("http_framework_request")
+    res = tool.handler(url="http://example.com/")
+    vuln_types = {v["type"] for v in res["vulnerabilities"]}
+    assert vuln_types == {"missing_security_header"}
+    assert len(res["vulnerabilities"]) == 5
+    assert all(v["severity"] == "medium" for v in res["vulnerabilities"])
+
+
+def test_intercept_request_flags_sensitive_data_disclosure(monkeypatch):
+    fake_response = _FakeResponse(status_code=200, headers={
+        "X-Frame-Options": "DENY", "X-Content-Type-Options": "nosniff",
+        "X-XSS-Protection": "1", "Strict-Transport-Security": "max-age=1",
+        "Content-Security-Policy": "default-src 'self'",
+    }, text="password: hunter2")
+    monkeypatch.setattr(_http_framework.session, "get", lambda url, params=None, headers=None, timeout=None: fake_response)
+
+    tool = ToolRegistry.get("http_framework_request")
+    res = tool.handler(url="http://example.com/")
+    vuln_types = {v["type"] for v in res["vulnerabilities"]}
+    assert "information_disclosure" in vuln_types
+
+
+def test_intercept_request_flags_sql_error_indicator(monkeypatch):
+    fake_response = _FakeResponse(status_code=500, headers={
+        "X-Frame-Options": "DENY", "X-Content-Type-Options": "nosniff",
+        "X-XSS-Protection": "1", "Strict-Transport-Security": "max-age=1",
+        "Content-Security-Policy": "default-src 'self'",
+    }, text="You have an error in your SQL syntax error near line 1")
+    monkeypatch.setattr(_http_framework.session, "get", lambda url, params=None, headers=None, timeout=None: fake_response)
+
+    tool = ToolRegistry.get("http_framework_request")
+    res = tool.handler(url="http://example.com/")
+    vuln_types = {v["type"] for v in res["vulnerabilities"]}
+    assert "sql_injection_indicator" in vuln_types
+
+
+def test_intercept_request_post_method_dispatch(monkeypatch):
+    captured = {}
+
+    def fake_post(url, data=None, headers=None, timeout=None):
+        captured["url"] = url
+        captured["data"] = data
+        return _FakeResponse(status_code=201, headers={
+            "X-Frame-Options": "DENY", "X-Content-Type-Options": "nosniff",
+            "X-XSS-Protection": "1", "Strict-Transport-Security": "max-age=1",
+            "Content-Security-Policy": "default-src 'self'",
+        }, text="created")
+
+    monkeypatch.setattr(_http_framework.session, "post", fake_post)
+
+    tool = ToolRegistry.get("http_framework_request")
+    res = tool.handler(url="http://example.com/create", method="POST", data={"name": "x"})
+    assert res["success"] is True
+    assert captured["url"] == "http://example.com/create"
+    assert captured["data"] == {"name": "x"}
+
+
+def test_intercept_request_failure_returns_error(monkeypatch):
+    def fake_get(url, params=None, headers=None, timeout=None):
+        raise requests.exceptions.ConnectionError("refused")
+
+    monkeypatch.setattr(_http_framework.session, "get", fake_get)
+
+    tool = ToolRegistry.get("http_framework_request")
+    res = tool.handler(url="http://unreachable.example.com/")
+    assert res["success"] is False
+    assert "refused" in res["error"]

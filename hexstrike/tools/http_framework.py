@@ -1,6 +1,7 @@
 from typing import Dict, Any, Optional, List
 import re
 import requests
+from datetime import datetime
 from urllib.parse import urlparse, parse_qsl, urlencode, urlunparse
 from hexstrike.core.registry import ToolRegistry
 
@@ -82,6 +83,121 @@ class HTTPTestingFramework:
             return original_url, data, headers
         return url, out_data, out_headers
 
+    def intercept_request(self, url: str, method: str = 'GET', data: dict = None,
+                           headers: dict = None, cookies: dict = None) -> dict:
+        try:
+            if headers:
+                self.session.headers.update(headers)
+            if cookies:
+                self.session.cookies.update(cookies)
+
+            url, data, send_headers = self._apply_match_replace(url, data, dict(self.session.headers))
+            if headers:
+                send_headers.update(headers)
+
+            if method.upper() == 'GET':
+                response = self.session.get(url, params=data, headers=send_headers, timeout=30)
+            elif method.upper() == 'POST':
+                response = self.session.post(url, data=data, headers=send_headers, timeout=30)
+            elif method.upper() == 'PUT':
+                response = self.session.put(url, data=data, headers=send_headers, timeout=30)
+            elif method.upper() == 'DELETE':
+                response = self.session.delete(url, headers=send_headers, timeout=30)
+            else:
+                response = self.session.request(method, url, data=data, headers=send_headers, timeout=30)
+
+            self._req_id += 1
+            request_data = {
+                'id': self._req_id,
+                'url': url,
+                'method': method,
+                'headers': dict(response.request.headers),
+                'data': data,
+                'timestamp': datetime.now().isoformat()
+            }
+
+            response_data = {
+                'status_code': response.status_code,
+                'headers': dict(response.headers),
+                'content': response.text[:10000],
+                'size': len(response.content),
+                'time': response.elapsed.total_seconds()
+            }
+
+            self.proxy_history.append({'request': request_data, 'response': response_data})
+            self._analyze_response_for_vulns(url, response)
+
+            return {
+                'success': True,
+                'request': request_data,
+                'response': response_data,
+                'vulnerabilities': self._get_recent_vulns()
+            }
+
+        except Exception as e:
+            return {'success': False, 'error': str(e)}
+
+    def _analyze_response_for_vulns(self, url: str, response):
+        vulns = []
+
+        security_headers = {
+            'X-Frame-Options': 'Clickjacking protection missing',
+            'X-Content-Type-Options': 'MIME type sniffing protection missing',
+            'X-XSS-Protection': 'XSS protection missing',
+            'Strict-Transport-Security': 'HTTPS enforcement missing',
+            'Content-Security-Policy': 'Content Security Policy missing'
+        }
+
+        for header, description in security_headers.items():
+            if header not in response.headers:
+                vulns.append({
+                    'type': 'missing_security_header',
+                    'severity': 'medium',
+                    'description': description,
+                    'url': url,
+                    'header': header
+                })
+
+        sensitive_patterns = [
+            (r'password\s*[:=]\s*["\']?([^"\'\s]+)', 'Password disclosure'),
+            (r'api[_-]?key\s*[:=]\s*["\']?([^"\'\s]+)', 'API key disclosure'),
+            (r'secret\s*[:=]\s*["\']?([^"\'\s]+)', 'Secret disclosure'),
+            (r'token\s*[:=]\s*["\']?([^"\'\s]+)', 'Token disclosure')
+        ]
+
+        for pattern, description in sensitive_patterns:
+            matches = re.findall(pattern, response.text, re.IGNORECASE)
+            if matches:
+                vulns.append({
+                    'type': 'information_disclosure',
+                    'severity': 'high',
+                    'description': description,
+                    'url': url,
+                    'matches': matches[:5]
+                })
+
+        sql_errors = [
+            'SQL syntax error',
+            'mysql_fetch_array',
+            'ORA-01756',
+            'Microsoft OLE DB Provider',
+            'PostgreSQL query failed'
+        ]
+
+        for error in sql_errors:
+            if error.lower() in response.text.lower():
+                vulns.append({
+                    'type': 'sql_injection_indicator',
+                    'severity': 'high',
+                    'description': f'Potential SQL injection: {error}',
+                    'url': url
+                })
+
+        self.vulnerabilities.extend(vulns)
+
+    def _get_recent_vulns(self, limit: int = 10):
+        return self.vulnerabilities[-limit:] if self.vulnerabilities else []
+
 
 _http_framework = HTTPTestingFramework()
 
@@ -106,3 +222,13 @@ def http_framework_set_rules(rules: Optional[list] = None) -> Dict[str, Any]:
 def http_framework_set_scope(host: str, include_subdomains: bool = True) -> Dict[str, Any]:
     _http_framework.set_scope(host, include_subdomains)
     return {"success": True, "scope": _http_framework.scope}
+
+
+@ToolRegistry.register(
+    name="http_framework_request",
+    category="webtest",
+    description="Intercept and analyze an HTTP request/response for vulnerabilities",
+    endpoint="/api/tools/http-framework/request"
+)
+def http_framework_request(url: str, method: str = "GET", data: Optional[dict] = None, headers: Optional[dict] = None, cookies: Optional[dict] = None) -> Dict[str, Any]:
+    return _http_framework.intercept_request(url, method, data, headers, cookies)
