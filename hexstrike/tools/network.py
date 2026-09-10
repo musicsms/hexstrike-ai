@@ -1,4 +1,5 @@
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, Annotated
+from pydantic import Field
 from hexstrike.core.registry import ToolRegistry
 from hexstrike.tools.base import run_tool_command
 
@@ -8,7 +9,12 @@ from hexstrike.tools.base import run_tool_command
     description="Scan target host or network using Nmap - most accurate service/OS detection; slower than rustscan_scan/masscan_scan on large port ranges",
     endpoint="/api/tools/nmap"
 )
-def nmap_scan(target: str, scan_type: str = "-sV", ports: Optional[str] = None, additional_args: Optional[str] = None) -> Dict[str, Any]:
+def nmap_scan(
+    target: str,
+    scan_type: Annotated[str, Field(description="Raw Nmap scan flag(s), e.g. '-sV' (version detection), '-sS' (SYN stealth), '-sT' (TCP connect), '-sU' (UDP)")] = "-sV",
+    ports: Optional[str] = None,
+    additional_args: Optional[str] = None,
+) -> Dict[str, Any]:
     cmd = ["nmap"]
     if scan_type:
         cmd.extend(scan_type.split())
@@ -179,7 +185,15 @@ def nbtscan_scan(target: str, verbose: bool = False, timeout: int = 2, additiona
     description="Network service exploitation using NetExec (formerly CrackMapExec)",
     endpoint="/api/tools/netexec"
 )
-def netexec_scan(target: str, protocol: str = "smb", username: Optional[str] = None, password: Optional[str] = None, hash: Optional[str] = None, module: Optional[str] = None, additional_args: Optional[str] = None) -> Dict[str, Any]:
+def netexec_scan(
+    target: str,
+    protocol: Annotated[str, Field(description="Target service protocol, e.g. 'smb', 'winrm', 'ssh', 'ldap', 'rdp'")] = "smb",
+    username: Optional[str] = None,
+    password: Optional[str] = None,
+    hash: Annotated[Optional[str], Field(description="NTLM hash for pass-the-hash auth, format 'LM:NT' or just the NT hash, used instead of password")] = None,
+    module: Annotated[Optional[str], Field(description="NetExec module name to run against the target, e.g. 'mimikatz', 'lsassy'")] = None,
+    additional_args: Optional[str] = None,
+) -> Dict[str, Any]:
     cmd = ["nxc", protocol, target]
     if username:
         cmd.extend(["-u", username])
@@ -219,7 +233,14 @@ def responder_capture(interface: str = "eth0", analyze: bool = False, wpad: bool
     description="RPC enumeration using rpcclient - low-level, scriptable RPC calls for targeted manual enumeration",
     endpoint="/api/tools/rpcclient"
 )
-def rpcclient_enum(target: str, username: Optional[str] = None, password: Optional[str] = None, domain: Optional[str] = None, commands: str = "enumdomusers;enumdomgroups;querydominfo", additional_args: Optional[str] = None) -> Dict[str, Any]:
+def rpcclient_enum(
+    target: str,
+    username: Optional[str] = None,
+    password: Optional[str] = None,
+    domain: Optional[str] = None,
+    commands: Annotated[str, Field(description="Semicolon-separated rpcclient commands to run, e.g. 'enumdomusers;enumdomgroups;querydominfo'")] = "enumdomusers;enumdomgroups;querydominfo",
+    additional_args: Optional[str] = None,
+) -> Dict[str, Any]:
     cmd = ["rpcclient"]
     if username and password:
         cmd.extend(["-U", f"{username}%{password}"])
@@ -274,7 +295,18 @@ def subfinder_enum(domain: str, silent: bool = True, all_sources: bool = False, 
     description="Advanced Nmap scans with custom NSE scripts and optimized timing - for deep scripted analysis after initial discovery, not a first pass",
     endpoint="/api/tools/nmap-advanced"
 )
-def nmap_advanced_scan(target: str, scan_type: str = "-sS", ports: Optional[str] = None, timing: str = "T4", nse_scripts: Optional[str] = None, os_detection: bool = False, version_detection: bool = False, aggressive: bool = False, stealth: bool = False, additional_args: Optional[str] = None) -> Dict[str, Any]:
+def nmap_advanced_scan(
+    target: str,
+    scan_type: Annotated[str, Field(description="Raw Nmap scan flag(s), e.g. '-sS' (SYN stealth), '-sV' (version detection)")] = "-sS",
+    ports: Optional[str] = None,
+    timing: Annotated[str, Field(description="Nmap timing template T0 (slowest/most stealthy) to T5 (fastest/most aggressive); T4 is the common default")] = "T4",
+    nse_scripts: Annotated[Optional[str], Field(description="Comma-separated NSE script names or categories to run, e.g. 'vuln,default' or 'http-title'")] = None,
+    os_detection: bool = False,
+    version_detection: bool = False,
+    aggressive: bool = False,
+    stealth: bool = False,
+    additional_args: Optional[str] = None,
+) -> Dict[str, Any]:
     cmd = ["nmap"] + scan_type.split() + [target]
     if ports:
         cmd.extend(["-p", ports])
