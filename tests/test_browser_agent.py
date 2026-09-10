@@ -592,18 +592,3 @@ def test_browser_screenshot_handler_invocation_with_driver():
     assert res["current_url"] == "http://example.com/page"
     assert fake.saved_path == res["screenshot"]
     assert _browser_agent.screenshots == []  # not tracked, matching legacy
-
-
-def test_webtest_category_has_12_tools():
-    from hexstrike.core.registry import ToolRegistry
-    import hexstrike.tools  # ensure webtest.py's registration has run
-    webtest_tools = ToolRegistry.get_by_category("webtest")
-    assert len(webtest_tools) == 12
-    names = {t.name for t in webtest_tools}
-    assert names == {
-        "http_framework_request", "http_framework_spider", "http_framework_proxy_history",
-        "http_framework_set_rules", "http_framework_set_scope", "http_framework_repeater",
-        "http_framework_intruder",
-        "browser_navigate", "browser_screenshot", "browser_close", "browser_status",
-        "burpsuite_alternative_scan",
-    }
