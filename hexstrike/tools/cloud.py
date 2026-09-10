@@ -222,3 +222,25 @@ def terrascan_scan(scan_type: str = "all", iac_dir: str = ".", policy_type: Opti
     if additional_args:
         cmd.extend(additional_args.split())
     return run_tool_command(cmd)
+
+@ToolRegistry.register(
+    name="pacu_run",
+    category="cloud",
+    description="AWS exploitation framework automation using Pacu",
+    endpoint="/api/tools/pacu"
+)
+def pacu_run(session_name: str = "hexstrike_session", modules: Optional[str] = None, data_services: Optional[str] = None, regions: Optional[str] = None, additional_args: Optional[str] = None) -> Dict[str, Any]:
+    commands = [f"set_session {session_name}"]
+    if data_services:
+        commands.append(f"data {data_services}")
+    if regions:
+        commands.append(f"set_regions {regions}")
+    if modules:
+        for module in modules.split(","):
+            commands.append(f"run {module.strip()}")
+    commands.append("exit")
+
+    cmd = ["pacu"]
+    if additional_args:
+        cmd.extend(additional_args.split())
+    return run_tool_command(cmd, stdin_input="\n".join(commands))

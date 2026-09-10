@@ -248,12 +248,62 @@ def test_terrascan_scan_handler_invocation(monkeypatch):
     ]
 
 
-def test_cloud_category_has_11_tools():
+def test_pacu_run_handler_invocation(monkeypatch):
+    captured = {}
+
+    def fake_execute(cmd, **kwargs):
+        captured["cmd"] = cmd
+        captured["kwargs"] = kwargs
+        return {"success": True, "command": " ".join(cmd), "output": "", "cached": False}
+
+    monkeypatch.setattr("hexstrike.tools.base.is_tool_available", lambda name: True)
+    monkeypatch.setattr(default_process_manager, "execute_command", fake_execute)
+
+    tool = ToolRegistry.get("pacu_run")
+    assert tool is not None
+    assert tool.category == "cloud"
+    assert tool.endpoint == "/api/tools/pacu"
+
+    res = tool.handler(
+        session_name="mysess", data_services="s3,ec2", regions="us-east-1",
+        modules="iam__enum_users, s3__bucket_finder", additional_args="--force",
+    )
+    assert res["success"] is True
+    assert captured["cmd"] == ["pacu", "--force"]
+    assert captured["kwargs"]["stdin_input"] == (
+        "set_session mysess\n"
+        "data s3,ec2\n"
+        "set_regions us-east-1\n"
+        "run iam__enum_users\n"
+        "run s3__bucket_finder\n"
+        "exit"
+    )
+
+
+def test_pacu_run_handler_invocation_defaults(monkeypatch):
+    captured = {}
+
+    def fake_execute(cmd, **kwargs):
+        captured["cmd"] = cmd
+        captured["kwargs"] = kwargs
+        return {"success": True, "command": " ".join(cmd), "output": "", "cached": False}
+
+    monkeypatch.setattr("hexstrike.tools.base.is_tool_available", lambda name: True)
+    monkeypatch.setattr(default_process_manager, "execute_command", fake_execute)
+
+    tool = ToolRegistry.get("pacu_run")
+    res = tool.handler()
+    assert res["success"] is True
+    assert captured["cmd"] == ["pacu"]
+    assert captured["kwargs"]["stdin_input"] == "set_session hexstrike_session\nexit"
+
+
+def test_cloud_category_has_12_tools():
     cloud_tools = ToolRegistry.get_by_category("cloud")
-    assert len(cloud_tools) == 11
+    assert len(cloud_tools) == 12
     names = {t.name for t in cloud_tools}
     assert names == {
         "prowler_scan", "trivy_scan", "scout_suite_scan", "cloudmapper_run",
         "kube_hunter_scan", "kube_bench_scan", "docker_bench_security_scan",
-        "falco_scan", "clair_scan", "checkov_scan", "terrascan_scan",
+        "falco_scan", "clair_scan", "checkov_scan", "terrascan_scan", "pacu_run",
     }
