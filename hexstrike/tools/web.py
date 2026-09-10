@@ -1,4 +1,7 @@
-from typing import Dict, Any, Optional
+import base64
+import json
+from typing import Dict, Any, List, Optional
+import requests
 from hexstrike.core.registry import ToolRegistry
 from hexstrike.tools.base import run_tool_command
 
@@ -400,3 +403,279 @@ def uro_filter(urls: str, whitelist: Optional[str] = None, blacklist: Optional[s
     if additional_args:
         cmd.extend(additional_args.split())
     return run_tool_command(cmd, stdin_input=urls)
+
+@ToolRegistry.register(
+    name="jwt_analyzer_scan",
+    category="web",
+    description="JWT token analysis and vulnerability testing",
+    endpoint="/api/tools/jwt_analyzer"
+)
+def jwt_analyzer_scan(jwt_token: str, target_url: Optional[str] = None) -> Dict[str, Any]:
+    results: Dict[str, Any] = {
+        "token": jwt_token[:50] + "..." if len(jwt_token) > 50 else jwt_token,
+        "vulnerabilities": [],
+        "token_info": {},
+        "attack_vectors": []
+    }
+
+    try:
+        parts = jwt_token.split('.')
+        if len(parts) >= 2:
+            header_b64 = parts[0] + '=' * (4 - len(parts[0]) % 4)
+            payload_b64 = parts[1] + '=' * (4 - len(parts[1]) % 4)
+            try:
+                header = json.loads(base64.b64decode(header_b64))
+                payload = json.loads(base64.b64decode(payload_b64))
+                results["token_info"] = {
+                    "header": header,
+                    "payload": payload,
+                    "algorithm": header.get("alg", "unknown")
+                }
+                algorithm = header.get("alg", "").lower()
+                if algorithm == "none":
+                    results["vulnerabilities"].append({
+                        "type": "none_algorithm",
+                        "severity": "CRITICAL",
+                        "description": "JWT uses 'none' algorithm - no signature verification"
+                    })
+                if algorithm in ["hs256", "hs384", "hs512"]:
+                    results["attack_vectors"].append("hmac_key_confusion")
+                    results["vulnerabilities"].append({
+                        "type": "hmac_algorithm",
+                        "severity": "MEDIUM",
+                        "description": "HMAC algorithm detected - vulnerable to key confusion attacks"
+                    })
+                exp = payload.get("exp")
+                if not exp:
+                    results["vulnerabilities"].append({
+                        "type": "no_expiration",
+                        "severity": "HIGH",
+                        "description": "JWT token has no expiration time"
+                    })
+            except Exception as decode_error:
+                results["vulnerabilities"].append({
+                    "type": "malformed_token",
+                    "severity": "HIGH",
+                    "description": f"Token decoding failed: {str(decode_error)}"
+                })
+    except Exception:
+        results["vulnerabilities"].append({
+            "type": "invalid_format",
+            "severity": "HIGH",
+            "description": "Invalid JWT token format"
+        })
+
+    if target_url:
+        none_token_parts = jwt_token.split('.')
+        if len(none_token_parts) >= 2:
+            none_header = base64.b64encode(b'{"alg":"none","typ":"JWT"}').decode().rstrip('=')
+            none_token = f"{none_header}.{none_token_parts[1]}."
+            try:
+                response = requests.get(target_url, headers={"Authorization": f"Bearer {none_token}"}, timeout=30)
+                body_text = response.text
+            except requests.RequestException:
+                body_text = ""
+            if "200" in body_text or "success" in body_text.lower():
+                results["vulnerabilities"].append({
+                    "type": "none_algorithm_accepted",
+                    "severity": "CRITICAL",
+                    "description": "Server accepts tokens with 'none' algorithm"
+                })
+
+    return {"success": True, "jwt_analysis_results": results}
+
+@ToolRegistry.register(
+    name="api_schema_analyzer_scan",
+    category="web",
+    description="API schema analysis for security issues (OpenAPI/Swagger)",
+    endpoint="/api/tools/api_schema_analyzer"
+)
+def api_schema_analyzer_scan(schema_url: str, schema_type: str = "openapi") -> Dict[str, Any]:
+    try:
+        response = requests.get(schema_url, timeout=30)
+        schema_content = response.text
+        fetch_ok = response.ok
+    except requests.RequestException:
+        schema_content = ""
+        fetch_ok = False
+
+    if not fetch_ok:
+        return {"success": False, "error": "Failed to fetch API schema"}
+
+    analysis_results: Dict[str, Any] = {
+        "schema_url": schema_url,
+        "schema_type": schema_type,
+        "endpoints_found": [],
+        "security_issues": [],
+        "recommendations": []
+    }
+
+    try:
+        schema_data = json.loads(schema_content)
+
+        if schema_type.lower() in ["openapi", "swagger"]:
+            paths = schema_data.get("paths", {})
+            for path, methods in paths.items():
+                for method, details in methods.items():
+                    if isinstance(details, dict):
+                        endpoint_info = {
+                            "path": path,
+                            "method": method.upper(),
+                            "summary": details.get("summary", ""),
+                            "parameters": details.get("parameters", []),
+                            "security": details.get("security", [])
+                        }
+                        analysis_results["endpoints_found"].append(endpoint_info)
+
+                        if not endpoint_info["security"]:
+                            analysis_results["security_issues"].append({
+                                "endpoint": f"{method.upper()} {path}",
+                                "issue": "no_authentication",
+                                "severity": "MEDIUM",
+                                "description": "Endpoint has no authentication requirements"
+                            })
+
+                        for param in endpoint_info["parameters"]:
+                            param_name = param.get("name", "").lower()
+                            if any(sensitive in param_name for sensitive in ["password", "token", "key", "secret"]):
+                                analysis_results["security_issues"].append({
+                                    "endpoint": f"{method.upper()} {path}",
+                                    "issue": "sensitive_parameter",
+                                    "severity": "HIGH",
+                                    "description": f"Sensitive parameter detected: {param_name}"
+                                })
+
+        if analysis_results["security_issues"]:
+            analysis_results["recommendations"] = [
+                "Implement authentication for all endpoints",
+                "Use HTTPS for all API communications",
+                "Validate and sanitize all input parameters",
+                "Implement rate limiting",
+                "Add proper error handling",
+                "Use secure headers (CORS, CSP, etc.)"
+            ]
+
+    except json.JSONDecodeError:
+        analysis_results["security_issues"].append({
+            "endpoint": "schema",
+            "issue": "invalid_json",
+            "severity": "HIGH",
+            "description": "Schema is not valid JSON"
+        })
+
+    return {"success": True, "schema_analysis_results": analysis_results}
+
+@ToolRegistry.register(
+    name="graphql_scanner_scan",
+    category="web",
+    description="GraphQL security scanning and introspection testing",
+    endpoint="/api/tools/graphql_scanner"
+)
+def graphql_scanner_scan(endpoint: str, introspection: bool = True, query_depth: int = 10, test_mutations: bool = True) -> Dict[str, Any]:
+    results: Dict[str, Any] = {
+        "endpoint": endpoint,
+        "tests_performed": [],
+        "vulnerabilities": [],
+        "recommendations": []
+    }
+
+    if introspection:
+        introspection_query = '''
+            {
+                __schema {
+                    types {
+                        name
+                        fields {
+                            name
+                            type {
+                                name
+                            }
+                        }
+                    }
+                }
+            }
+            '''
+        clean_query = introspection_query.replace('\n', ' ').replace('  ', ' ').strip()
+        try:
+            response = requests.post(endpoint, json={"query": clean_query}, timeout=30)
+            body_text = response.text
+        except requests.RequestException:
+            body_text = ""
+
+        results["tests_performed"].append("introspection_query")
+        if "data" in body_text:
+            results["vulnerabilities"].append({
+                "type": "introspection_enabled",
+                "severity": "MEDIUM",
+                "description": "GraphQL introspection is enabled"
+            })
+
+    deep_query = "{ " * query_depth + "field" + " }" * query_depth
+    try:
+        response = requests.post(endpoint, json={"query": deep_query}, timeout=30)
+        body_text = response.text
+    except requests.RequestException:
+        body_text = ""
+
+    results["tests_performed"].append("query_depth_analysis")
+    if "error" not in body_text.lower():
+        results["vulnerabilities"].append({
+            "type": "no_query_depth_limit",
+            "severity": "HIGH",
+            "description": f"No query depth limiting detected (tested depth: {query_depth})"
+        })
+
+    batch_query = [{"query": "{field}"} for _ in range(10)]
+    try:
+        response = requests.post(endpoint, json=batch_query, timeout=30)
+        body_text = response.text
+        batch_ok = response.ok
+    except requests.RequestException:
+        body_text = ""
+        batch_ok = False
+
+    results["tests_performed"].append("batch_query_testing")
+    if "data" in body_text and batch_ok:
+        results["vulnerabilities"].append({
+            "type": "batch_queries_allowed",
+            "severity": "MEDIUM",
+            "description": "Batch queries are allowed without rate limiting"
+        })
+
+    if results["vulnerabilities"]:
+        results["recommendations"] = [
+            "Disable introspection in production",
+            "Implement query depth limiting",
+            "Add rate limiting for batch queries",
+            "Implement query complexity analysis",
+            "Add authentication for sensitive operations"
+        ]
+
+    return {"success": True, "graphql_scan_results": results}
+
+@ToolRegistry.register(
+    name="api_fuzzer_scan",
+    category="web",
+    description="API endpoint fuzzing with intelligent parameter discovery",
+    endpoint="/api/tools/api_fuzzer"
+)
+def api_fuzzer_scan(base_url: str, endpoints: Optional[List[str]] = None, methods: Optional[List[str]] = None, wordlist: str = "/usr/share/wordlists/api/api-endpoints.txt") -> Dict[str, Any]:
+    if methods is None:
+        methods = ["GET", "POST", "PUT", "DELETE"]
+
+    if endpoints:
+        results = []
+        for endpoint in endpoints:
+            for method in methods:
+                test_url = f"{base_url.rstrip('/')}/{endpoint.lstrip('/')}"
+                try:
+                    response = requests.request(method, test_url, timeout=10)
+                    result = {"success": True, "status_code": response.status_code, "size": len(response.content)}
+                except requests.RequestException as exc:
+                    result = {"success": False, "error": str(exc)}
+                results.append({"endpoint": endpoint, "method": method, "result": result})
+        return {"success": True, "fuzzing_type": "endpoint_testing", "results": results}
+
+    cmd = ["ffuf", "-u", f"{base_url}/FUZZ", "-w", wordlist, "-mc", "200,201,202,204,301,302,307,401,403,405", "-t", "50"]
+    result = run_tool_command(cmd)
+    return {"success": True, "fuzzing_type": "endpoint_discovery", "result": result}
