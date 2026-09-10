@@ -1,5 +1,6 @@
 from flask import Flask, request, jsonify
 from hexstrike.core.registry import ToolRegistry, ToolSpec
+from hexstrike.core.logging_config import configure_logging
 from hexstrike.api.routes import api_bp
 import hexstrike.tools  # Ensure all tools are imported and registered
 
@@ -28,6 +29,7 @@ def create_tool_view(spec: ToolSpec):
     return tool_view
 
 def create_app(debug: bool = False) -> Flask:
+    configure_logging()
     app = Flask("hexstrike")
     app.debug = debug
 
