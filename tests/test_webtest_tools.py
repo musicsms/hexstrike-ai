@@ -169,6 +169,66 @@ def test_burpsuite_alternative_scan_exception_returns_error(monkeypatch):
     assert res == {"success": False, "error": "boom"}
 
 
+def test_burpsuite_alternative_scan_closes_browser_when_navigate_and_inspect_raises(monkeypatch):
+    # scan_type="spider" deliberately (not "comprehensive"): this test only cares
+    # about phase 1's cleanup-on-exception behavior; "comprehensive"/"active"
+    # would also run phase 3 and require mocking intercept_request for no reason
+    # relevant to this test.
+    close_calls = []
+
+    def fake_setup_browser(headless=True, proxy_port=None):
+        _browser_agent.driver = _FakeDriverHandle()
+        return True
+
+    def fake_close_browser():
+        close_calls.append(True)
+        _browser_agent.driver = None
+
+    def raise_error(url, wait_time=5):
+        raise Exception("navigate boom")
+
+    monkeypatch.setattr(_browser_agent, "setup_browser", fake_setup_browser)
+    monkeypatch.setattr(_browser_agent, "close_browser", fake_close_browser)
+    monkeypatch.setattr(_browser_agent, "navigate_and_inspect", raise_error)
+
+    tool = ToolRegistry.get("burpsuite_alternative_scan")
+    res = tool.handler(target="http://example.com/", scan_type="spider")
+
+    # the scan reports failure, but the browser it opened must still be closed
+    assert res == {"success": False, "error": "navigate boom"}
+    assert close_calls == [True]
+    assert _browser_agent.driver is None
+
+
+def test_burpsuite_alternative_scan_survives_close_browser_failure(monkeypatch):
+    # scan_type="spider" deliberately (not "comprehensive"): this test only cares
+    # about phase 1's teardown; "comprehensive"/"active" would also run phase 3
+    # and require mocking intercept_request for no reason relevant to this test.
+    def fake_setup_browser(headless=True, proxy_port=None):
+        _browser_agent.driver = _FakeDriverHandle()
+        return True
+
+    def fake_close_browser():
+        # simulate a dead driver connection raising on teardown
+        raise Exception("connection already closed")
+
+    monkeypatch.setattr(_browser_agent, "setup_browser", fake_setup_browser)
+    monkeypatch.setattr(_browser_agent, "close_browser", fake_close_browser)
+    monkeypatch.setattr(_browser_agent, "navigate_and_inspect", lambda url, wait_time=5: {"success": True})
+    monkeypatch.setattr(_http_framework, "spider_website", lambda base_url, max_depth=3, max_pages=100: {"success": True, "discovered_urls": [base_url]})
+
+    tool = ToolRegistry.get("burpsuite_alternative_scan")
+    res = tool.handler(target="http://example.com/", scan_type="spider")
+
+    # a teardown failure must not discard the completed scan result
+    assert res["success"] is True
+    assert "browser_analysis" in res
+    assert "spider_analysis" in res
+    assert "summary" in res
+    # the singleton must not be left wedged pointing at a dead driver
+    assert _browser_agent.driver is None
+
+
 def test_webtest_category_has_12_tools():
     from hexstrike.core.registry import ToolRegistry
     webtest_tools = ToolRegistry.get_by_category("webtest")
