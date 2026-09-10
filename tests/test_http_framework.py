@@ -1,15 +1,10 @@
-import pytest
 import requests
 from hexstrike.core.registry import ToolRegistry
 import hexstrike.tools
 from hexstrike.tools.http_framework import _http_framework
 
-
-@pytest.fixture(autouse=True)
-def _reset_http_framework():
-    _http_framework.reset()
-    yield
-    _http_framework.reset()
+# Autouse reset fixture lives in tests/conftest.py (shared with test_browser_agent.py
+# and test_webtest_tools.py, which touch the same http_framework/browser singletons).
 
 
 def test_http_framework_set_scope_handler_invocation():
