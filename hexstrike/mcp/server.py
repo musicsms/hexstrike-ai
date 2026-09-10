@@ -4,6 +4,7 @@ import functools
 import inspect
 from fastmcp import FastMCP
 from hexstrike.core.config import DEFAULT_HEXSTRIKE_SERVER, COMMAND_TIMEOUT
+from hexstrike.core.logging_config import configure_logging
 from hexstrike.core.registry import ToolRegistry
 from hexstrike.mcp.client import HexStrikeClient
 import hexstrike.tools
@@ -32,6 +33,7 @@ def setup_mcp_server(client: HexStrikeClient) -> FastMCP:
     return mcp
 
 def main():
+    configure_logging()
     parser = argparse.ArgumentParser(description="Run the HexStrike AI MCP Client")
     parser.add_argument("--server", type=str, default=DEFAULT_HEXSTRIKE_SERVER, help="HexStrike API server URL")
     parser.add_argument("--timeout", type=int, default=COMMAND_TIMEOUT, help="Request timeout in seconds")

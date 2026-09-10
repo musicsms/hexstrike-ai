@@ -2,11 +2,11 @@ from hexstrike.core.registry import ToolRegistry
 import hexstrike.tools
 
 
-def test_intelligence_category_has_3_tools():
-    tools = ToolRegistry.get_by_category("intelligence")
-    assert len(tools) == 3
-    names = {t.name for t in tools}
-    assert names == {"technology_detect", "rate_limit_detect", "rate_limit_adjust_timing"}
+def test_intelligence_category_includes_detector_tools():
+    # The "intelligence" category is split across intelligence.py (detectors, this file)
+    # and cve.py (CVE lookups) - see test_cve_tools.py for the full category count.
+    names = {t.name for t in ToolRegistry.get_by_category("intelligence")}
+    assert {"technology_detect", "rate_limit_detect", "rate_limit_adjust_timing"} <= names
 
 
 def test_technology_detect_from_headers():
