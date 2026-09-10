@@ -121,8 +121,8 @@ legacy count of 90, since 3 multi-action legacy endpoints expand into 12.
 
 ### `HTTPTestingFramework` — ported faithfully
 
-The full method set is ported unchanged in behavior:
-`intercept_request`, `setup_proxy`, `set_match_replace_rules`, `set_scope`,
+The full *reachable* method set is ported unchanged in behavior:
+`intercept_request`, `set_match_replace_rules`, `set_scope`,
 `_in_scope`, `_apply_match_replace`, `send_custom_request`,
 `intruder_sniper`, `_analyze_response_for_vulns`, `_get_recent_vulns`,
 `spider_website`. The vulnerability-detection heuristics (missing security
@@ -130,6 +130,12 @@ headers, sensitive-data regexes, SQL-error-string matching) are copied
 verbatim, including their exact regex patterns and severity labels — these
 are legacy's actual detection logic, not incidental scaffolding, and
 changing them would change what the tool finds.
+
+**`setup_proxy` is intentionally excluded**: `git show d689933:hexstrike_server.py
+| grep -n setup_proxy` confirms it's defined once and never called anywhere in
+legacy — not by any of the 7 `http-framework` actions, not by any other
+method on the class. It's dead code with no caller and no test surface;
+porting it would violate this project's established YAGNI stance.
 
 The module-level singleton (`_http_framework = HTTPTestingFramework()`) is
 created at import time, matching legacy's global-instance pattern.
