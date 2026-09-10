@@ -93,3 +93,14 @@ def test_volatility_scan_handler_invocation(monkeypatch):
     res = tool.handler(memory_file="/tmp/mem.dmp", plugin="pslist", profile="Win10x64", additional_args="-v")
     assert res["success"] is True
     assert captured["cmd"] == ["volatility", "-f", "/tmp/mem.dmp", "--profile=Win10x64", "pslist", "-v"]
+
+
+def test_volatility3_scan_handler_invocation(monkeypatch):
+    captured = _mock_execute(monkeypatch)
+    tool = ToolRegistry.get("volatility3_scan")
+    assert tool is not None
+    assert tool.endpoint == "/api/tools/volatility3"
+
+    res = tool.handler(memory_file="/tmp/mem.dmp", plugin="windows.pslist", output_file="/tmp/out.txt", additional_args="-v")
+    assert res["success"] is True
+    assert captured["cmd"] == ["vol.py", "-f", "/tmp/mem.dmp", "windows.pslist", "-o", "/tmp/out.txt", "-v"]

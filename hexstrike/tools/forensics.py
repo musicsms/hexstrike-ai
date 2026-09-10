@@ -90,3 +90,17 @@ def volatility_scan(memory_file: str, plugin: str, profile: Optional[str] = None
     if additional_args:
         cmd.extend(additional_args.split())
     return run_tool_command(cmd)
+
+@ToolRegistry.register(
+    name="volatility3_scan",
+    category="forensics",
+    description="Advanced memory forensics using Volatility 3",
+    endpoint="/api/tools/volatility3"
+)
+def volatility3_scan(memory_file: str, plugin: str, output_file: Optional[str] = None, additional_args: Optional[str] = None) -> Dict[str, Any]:
+    cmd = ["vol.py", "-f", memory_file, plugin]
+    if output_file:
+        cmd.extend(["-o", output_file])
+    if additional_args:
+        cmd.extend(additional_args.split())
+    return run_tool_command(cmd)
