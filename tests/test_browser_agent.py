@@ -316,3 +316,80 @@ def test_analyze_page_security_counts_inline_scripts_and_scores():
     assert inline_issue["count"] == 2
     assert result["total_issues"] == 1
     assert result["security_score"] == 90
+
+
+def test_analyze_cookies_flags_short_session_cookie():
+    cookies = [{"name": "sessionid", "value": "abc123"}]
+    issues = _browser_agent._analyze_cookies(cookies)
+    assert any(i["type"] == "weak_session_cookie" for i in issues)
+
+
+def test_analyze_cookies_ignores_long_session_cookie():
+    cookies = [{"name": "sessionid", "value": "a" * 32}]
+    issues = _browser_agent._analyze_cookies(cookies)
+    assert issues == []
+
+
+def test_analyze_security_headers_flags_missing_headers(monkeypatch):
+    class _FakeResponse:
+        headers = {}
+
+    monkeypatch.setattr("hexstrike.tools.browser.requests.get", lambda url, timeout=None, verify=None: _FakeResponse())
+
+    issues = _browser_agent._analyze_security_headers("<html></html>", {"url": "http://example.com"})
+    issue_types = {i["type"] for i in issues}
+    assert "missing_security_header" in issue_types
+    assert len(issues) == 5
+
+
+def test_analyze_security_headers_flags_weak_csp(monkeypatch):
+    class _FakeResponse:
+        headers = {
+            "content-security-policy": "default-src 'self' 'unsafe-inline'",
+            "x-frame-options": "DENY", "x-content-type-options": "nosniff",
+            "referrer-policy": "no-referrer", "strict-transport-security": "max-age=1",
+        }
+
+    monkeypatch.setattr("hexstrike.tools.browser.requests.get", lambda url, timeout=None, verify=None: _FakeResponse())
+
+    issues = _browser_agent._analyze_security_headers("<html></html>", {"url": "http://example.com"})
+    assert any(i["type"] == "weak_csp" for i in issues)
+
+
+def test_analyze_security_headers_request_failure_returns_empty(monkeypatch):
+    def fake_get(url, timeout=None, verify=None):
+        raise Exception("connection refused")
+
+    monkeypatch.setattr("hexstrike.tools.browser.requests.get", fake_get)
+
+    issues = _browser_agent._analyze_security_headers("<html></html>", {"url": "http://unreachable.example.com"})
+    assert issues == []
+
+
+def test_detect_mixed_content_flags_http_resource_on_https_page():
+    page_info = {"url": "https://example.com", "network_requests": [{"url": "http://insecure.example.com/img.png"}]}
+    issues = _browser_agent._detect_mixed_content(page_info)
+    assert any(i["type"] == "mixed_content" for i in issues)
+
+
+def test_detect_mixed_content_no_issue_on_http_page():
+    page_info = {"url": "http://example.com", "network_requests": [{"url": "http://other.com/img.png"}]}
+    issues = _browser_agent._detect_mixed_content(page_info)
+    assert issues == []
+
+
+def test_extended_passive_analysis_aggregates_modules(monkeypatch):
+    class _FakeResponse:
+        headers = {}
+
+    monkeypatch.setattr("hexstrike.tools.browser.requests.get", lambda url, timeout=None, verify=None: _FakeResponse())
+
+    page_info = {
+        "url": "https://example.com",
+        "cookies": [{"name": "sessionid", "value": "short"}],
+        "network_requests": [{"url": "http://insecure.example.com/x"}],
+        "console_errors": [{"level": "SEVERE", "message": "err"}],
+    }
+    result = _browser_agent._extended_passive_analysis(page_info, "<html></html>")
+    assert set(result["modules"]) == {"cookie_analysis", "security_headers", "mixed_content", "console_log_capture"}
+    assert len(result["issues"]) > 0

@@ -3,6 +3,7 @@ from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
 import json
+import requests
 from hexstrike.core.registry import ToolRegistry
 
 
@@ -212,6 +213,65 @@ class BrowserAgent:
             'issues': issues,
             'security_score': max(0, 100 - (len(issues) * 10))
         }
+
+    def _analyze_cookies(self, cookies: list) -> list:
+        issues = []
+        for ck in cookies:
+            name = ck.get('name', '')
+            if name.lower() in ('sessionid', 'phpsessid', 'jsessionid') and len(ck.get('value', '')) < 16:
+                issues.append({'type': 'weak_session_cookie', 'severity': 'medium', 'description': f'Session cookie {name} appears short'})
+        return issues
+
+    def _analyze_security_headers(self, page_source: str, page_info: dict) -> list:
+        issues = []
+        try:
+            resp = requests.get(page_info.get('url', ''), timeout=10, verify=False)
+            headers = {k.lower(): v for k, v in resp.headers.items()}
+            required = {
+                'content-security-policy': 'CSP header missing (XSS mitigation)',
+                'x-frame-options': 'X-Frame-Options missing (Clickjacking risk)',
+                'x-content-type-options': 'X-Content-Type-Options missing (MIME sniffing risk)',
+                'referrer-policy': 'Referrer-Policy missing (leaky referrers)',
+                'strict-transport-security': 'HSTS missing (HTTPS downgrade risk)'
+            }
+            for key, desc in required.items():
+                if key not in headers:
+                    issues.append({'type': 'missing_security_header', 'severity': 'medium', 'description': desc, 'header': key})
+            csp = headers.get('content-security-policy', '')
+            if csp and "unsafe-inline" in csp:
+                issues.append({'type': 'weak_csp', 'severity': 'low', 'description': 'CSP allows unsafe-inline scripts'})
+        except Exception:
+            pass
+        return issues
+
+    def _detect_mixed_content(self, page_info: dict) -> list:
+        issues = []
+        try:
+            page_url = page_info.get('url', '')
+            if page_url.startswith('https://'):
+                for req in page_info.get('network_requests', [])[:200]:
+                    u = req.get('url', '')
+                    if u.startswith('http://'):
+                        issues.append({'type': 'mixed_content', 'severity': 'medium', 'description': f'HTTP resource loaded over HTTPS page: {u[:100]}'})
+        except Exception:
+            pass
+        return issues
+
+    def _extended_passive_analysis(self, page_info: dict, page_source: str) -> dict:
+        modules = []
+        issues = []
+        cookie_issues = self._analyze_cookies(page_info.get('cookies', []))
+        if cookie_issues:
+            issues.extend(cookie_issues); modules.append('cookie_analysis')
+        header_issues = self._analyze_security_headers(page_source, page_info)
+        if header_issues:
+            issues.extend(header_issues); modules.append('security_headers')
+        mixed = self._detect_mixed_content(page_info)
+        if mixed:
+            issues.extend(mixed); modules.append('mixed_content')
+        if page_info.get('console_errors'):
+            modules.append('console_log_capture')
+        return {'issues': issues, 'modules': modules}
 
 
 _browser_agent = BrowserAgent()
