@@ -1,8 +1,10 @@
+import subprocess
 import threading
 import time as time_module
 
 import pytest
 from hexstrike.core.process import ProcessManager
+import hexstrike.core.process as process_module
 
 def test_process_manager_execution():
     pm = ProcessManager()
@@ -76,6 +78,60 @@ def test_process_registry_removes_entry_after_timeout():
     pm = ProcessManager()
     result = pm.execute_command(["sleep", "2"], timeout=1, use_cache=False)
     assert result["success"] is False
+    assert pm.list_active_processes() == []
+
+def test_timeout_does_not_hang_when_child_has_grandchild_holding_pipes():
+    # Regression test for a hang: subprocess.run()-style code that calls
+    # proc.kill() then a *second* proc.communicate() on timeout will block
+    # forever waiting for EOF on stdout/stderr if a backgrounded grandchild
+    # process inherited those pipe file descriptors. The fix uses
+    # proc.kill() + proc.wait() (no second communicate()) so the timeout
+    # path returns promptly regardless of what the killed child spawned.
+    pm = ProcessManager()
+    start = time_module.time()
+    result = pm.execute_command(
+        ["sh", "-c", "(sleep 10 &) ; sleep 10"],
+        timeout=2,
+        use_cache=False,
+    )
+    elapsed = time_module.time() - start
+    assert result["success"] is False
+    assert "timed out" in result["error"].lower()
+    assert elapsed < 5  # must return promptly, not hang for the full 10s+ the grandchild would run
+    assert pm.list_active_processes() == []
+
+def test_registry_entry_removed_even_when_reap_cleanup_raises(monkeypatch):
+    # The outer `finally` block's reap cleanup (poll/kill/wait) and the
+    # registry pop() must be independent: if the cleanup step itself raises,
+    # the registry entry must still be removed rather than leaking forever.
+    # We monkeypatch subprocess.Popen (as used inside hexstrike.core.process)
+    # with a thin wrapper around the real Popen whose poll() always raises,
+    # so the real execute_command cleanup path is exercised end to end.
+    real_popen = subprocess.Popen
+
+    class PollRaisingPopen:
+        def __init__(self, *args, **kwargs):
+            self._inner = real_popen(*args, **kwargs)
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            return self._inner.__exit__(exc_type, exc, tb)
+
+        def poll(self):
+            raise OSError("simulated cleanup failure")
+
+        def __getattr__(self, name):
+            return getattr(self._inner, name)
+
+    monkeypatch.setattr(process_module.subprocess, "Popen", PollRaisingPopen)
+
+    pm = ProcessManager()
+    result = pm.execute_command(["sleep", "2"], timeout=1, use_cache=False)
+
+    assert result["success"] is False
+    assert "simulated cleanup failure" in result["error"]
     assert pm.list_active_processes() == []
 
 def test_get_process_status_unknown_pid_returns_none():

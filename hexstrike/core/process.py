@@ -62,31 +62,33 @@ class ProcessManager:
                 popen_kwargs["stdin"] = subprocess.PIPE
             if cwd is not None:
                 popen_kwargs["cwd"] = cwd
-            proc = subprocess.Popen(command, **popen_kwargs)
 
-            with self._registry_lock:
-                self.active_processes[proc.pid] = {
-                    "pid": proc.pid,
-                    "command": cmd_str,
-                    "start_time": start_time,
-                    "status": "running",
-                    "task_id": getattr(_current_task_id, "value", None),
-                    "process": proc,
-                }
-
-            try:
-                try:
-                    stdout, stderr = proc.communicate(input=stdin_input, timeout=timeout)
-                except subprocess.TimeoutExpired:
-                    proc.kill()
-                    proc.communicate()
-                    raise
-            finally:
-                if proc.poll() is None:
-                    proc.kill()
-                    proc.communicate()
+            with subprocess.Popen(command, **popen_kwargs) as proc:
                 with self._registry_lock:
-                    self.active_processes.pop(proc.pid, None)
+                    self.active_processes[proc.pid] = {
+                        "pid": proc.pid,
+                        "command": cmd_str,
+                        "start_time": start_time,
+                        "status": "running",
+                        "task_id": getattr(_current_task_id, "value", None),
+                        "process": proc,
+                    }
+
+                try:
+                    try:
+                        stdout, stderr = proc.communicate(input=stdin_input, timeout=timeout)
+                    except subprocess.TimeoutExpired:
+                        proc.kill()
+                        proc.wait()
+                        raise
+                finally:
+                    try:
+                        if proc.poll() is None:
+                            proc.kill()
+                            proc.wait()
+                    finally:
+                        with self._registry_lock:
+                            self.active_processes.pop(proc.pid, None)
 
             elapsed = f"{time.time() - start_time:.2f}s"
             success = (proc.returncode == 0)
@@ -207,7 +209,7 @@ class ProcessManager:
         if entry is None:
             return {"success": False, "pid": pid, "error": "process not found"}
         try:
-            os.kill(pid, signal.SIGSTOP)
+            entry["process"].send_signal(signal.SIGSTOP)
         except ProcessLookupError:
             return {"success": False, "pid": pid, "error": "process not found"}
         with self._registry_lock:
@@ -223,7 +225,7 @@ class ProcessManager:
         if entry is None:
             return {"success": False, "pid": pid, "error": "process not found"}
         try:
-            os.kill(pid, signal.SIGCONT)
+            entry["process"].send_signal(signal.SIGCONT)
         except ProcessLookupError:
             return {"success": False, "pid": pid, "error": "process not found"}
         with self._registry_lock:
