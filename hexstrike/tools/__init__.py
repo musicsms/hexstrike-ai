@@ -1,1 +1,1 @@
-from hexstrike.tools import network, web, binary, password, osint, cloud, forensics, exploitation, http_framework, browser, webtest, intelligence, cve
+from hexstrike.tools import network, web, binary, password, osint, cloud, forensics, exploitation, http_framework, browser, webtest, intelligence, cve, process_management
