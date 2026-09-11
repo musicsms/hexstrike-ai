@@ -135,3 +135,28 @@ def test_pause_process_on_unknown_pid():
     pm = ProcessManager()
     result = pm.pause_process(999999)
     assert result["success"] is False
+
+def test_telemetry_starts_at_zero():
+    pm = ProcessManager()
+    stats = pm.get_telemetry_stats()
+    assert stats["commands_executed"] == 0
+    assert stats["success_rate"] == "0.0%"
+    assert stats["average_execution_time"] == "0.00s"
+    assert "system_metrics" in stats
+
+def test_telemetry_records_success_and_failure():
+    pm = ProcessManager()
+    pm.execute_command(["echo", "hi"], use_cache=False)
+    pm.execute_command(["false"], use_cache=False)
+    stats = pm.get_telemetry_stats()
+    assert stats["commands_executed"] == 2
+    assert stats["success_rate"] == "50.0%"
+
+def test_telemetry_counts_cache_hits():
+    pm = ProcessManager()
+    cmd = ["echo", "cached"]
+    pm.execute_command(cmd, use_cache=True)
+    pm.execute_command(cmd, use_cache=True)
+    stats = pm.get_telemetry_stats()
+    assert stats["commands_executed"] == 2
+    assert stats["success_rate"] == "100.0%"

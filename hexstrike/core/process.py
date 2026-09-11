@@ -5,6 +5,7 @@ import time
 import subprocess
 from typing import List, Dict, Any, Optional
 from hexstrike.core.config import COMMAND_TIMEOUT, CACHE_SIZE, CACHE_TTL
+from hexstrike.core.resource_monitor import default_resource_monitor
 
 _current_task_id = threading.local()
 
@@ -17,6 +18,13 @@ class ProcessManager:
         self.cache_misses = 0
         self.active_processes: Dict[int, Dict[str, Any]] = {}
         self._registry_lock = threading.RLock()
+        self.telemetry = {
+            "commands_executed": 0,
+            "successful_commands": 0,
+            "failed_commands": 0,
+            "total_execution_time": 0.0,
+            "start_time": time.time(),
+        }
 
     def _get_cache_key(self, command: List[str], stdin_input: Optional[str] = None, cwd: Optional[str] = None) -> str:
         key = " ".join(command)
@@ -35,6 +43,7 @@ class ProcessManager:
             entry = self.cache[cache_key]
             if now - entry["timestamp"] < self.cache_ttl:
                 self.cache_hits += 1
+                self.record_telemetry(True, 0.0)
                 return {
                     "success": entry["success"],
                     "command": cmd_str,
@@ -104,24 +113,29 @@ class ProcessManager:
                     "timestamp": now
                 }
 
+            self.record_telemetry(result_data["success"], time.time() - start_time)
             return result_data
 
         except subprocess.TimeoutExpired:
+            elapsed_seconds = time.time() - start_time
+            self.record_telemetry(False, elapsed_seconds)
             return {
                 "success": False,
                 "command": cmd_str,
                 "output": "",
                 "error": f"Command timed out after {timeout} seconds",
-                "execution_time": f"{time.time() - start_time:.2f}s",
+                "execution_time": f"{elapsed_seconds:.2f}s",
                 "cached": False
             }
         except Exception as exc:
+            elapsed_seconds = time.time() - start_time
+            self.record_telemetry(False, elapsed_seconds)
             return {
                 "success": False,
                 "command": cmd_str,
                 "output": "",
                 "error": str(exc),
-                "execution_time": f"{time.time() - start_time:.2f}s",
+                "execution_time": f"{elapsed_seconds:.2f}s",
                 "cached": False
             }
 
@@ -216,5 +230,30 @@ class ProcessManager:
             if pid in self.active_processes:
                 self.active_processes[pid]["status"] = "running"
         return {"success": True, "pid": pid}
+
+    def record_telemetry(self, success: bool, execution_time: float) -> None:
+        with self._registry_lock:
+            self.telemetry["commands_executed"] += 1
+            if success:
+                self.telemetry["successful_commands"] += 1
+            else:
+                self.telemetry["failed_commands"] += 1
+            self.telemetry["total_execution_time"] += execution_time
+
+    def get_telemetry_stats(self) -> Dict[str, Any]:
+        with self._registry_lock:
+            executed = self.telemetry["commands_executed"]
+            successful = self.telemetry["successful_commands"]
+            total_time = self.telemetry["total_execution_time"]
+            uptime = time.time() - self.telemetry["start_time"]
+        success_rate = f"{(successful / executed * 100):.1f}%" if executed > 0 else "0.0%"
+        avg_time = f"{(total_time / executed):.2f}s" if executed > 0 else "0.00s"
+        return {
+            "uptime_seconds": uptime,
+            "commands_executed": executed,
+            "success_rate": success_rate,
+            "average_execution_time": avg_time,
+            "system_metrics": default_resource_monitor.get_current_usage(),
+        }
 
 default_process_manager = ProcessManager()
