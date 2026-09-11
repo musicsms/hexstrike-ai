@@ -151,15 +151,7 @@ def ropper_scan(
     search_string: Optional[str] = None,
     additional_args: Optional[str] = None,
 ) -> Dict[str, Any]:
-    cmd = ["ropper", "--file", binary]
-    if gadget_type == "rop":
-        cmd.append("--rop")
-    elif gadget_type == "jop":
-        cmd.append("--jop")
-    elif gadget_type == "sys":
-        cmd.append("--sys")
-    elif gadget_type == "all":
-        cmd.append("--all")
+    cmd = ["ropper", "--file", binary, "--type", gadget_type]
     if quality > 1:
         cmd.extend(["--quality", str(quality)])
     if arch:
@@ -180,7 +172,7 @@ def pwninit_setup(
     binary: str,
     libc: Optional[str] = None,
     ld: Optional[str] = None,
-    template_type: Annotated[Optional[str], Field(description="Exploit template language pwninit should generate, e.g. 'python' (pwntools) or 'rust'")] = "python",
+    template_path: Annotated[Optional[str], Field(description="Path to a custom Jinja2 exploit template file for pwninit to render instead of its built-in template")] = None,
     additional_args: Optional[str] = None,
 ) -> Dict[str, Any]:
     cmd = ["pwninit", "--bin", binary]
@@ -188,8 +180,8 @@ def pwninit_setup(
         cmd.extend(["--libc", libc])
     if ld:
         cmd.extend(["--ld", ld])
-    if template_type:
-        cmd.extend(["--template", template_type])
+    if template_path:
+        cmd.extend(["--template-path", template_path])
     if additional_args:
         cmd.extend(additional_args.split())
     return run_tool_command(cmd)
@@ -394,12 +386,12 @@ def _resolve_libc_database_dir() -> Optional[str]:
 )
 def libc_database_lookup(
     action: Annotated[str, Field(description="'find' to search by leaked symbol addresses, 'dump' to dump offsets for a known libc_id, 'download' to fetch that libc binary")] = "find",
-    symbols: Optional[str] = None,
+    symbols: Annotated[Optional[str], Field(description="Space-separated 'name address [name address ...]' pairs, e.g. 'puts 0x821 printf 0x67' (libc-database's ./find takes these as separate positional args, not a single combined string)")] = None,
     libc_id: Optional[str] = None,
     additional_args: Optional[str] = None,
 ) -> Dict[str, Any]:
     if action == "find":
-        cmd = ["./find", symbols]
+        cmd = ["./find"] + (symbols.split() if symbols else [])
     elif action == "dump":
         cmd = ["./dump", libc_id]
     elif action == "download":

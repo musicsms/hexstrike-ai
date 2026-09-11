@@ -16,6 +16,26 @@ def _mock_execute(monkeypatch):
     return captured
 
 
+def test_rustscan_scan_handler_invocation_comma_ports(monkeypatch):
+    captured = _mock_execute(monkeypatch)
+    tool = ToolRegistry.get("rustscan_scan")
+    assert tool is not None
+    assert tool.endpoint == "/api/tools/rustscan"
+
+    res = tool.handler(target="10.0.0.5", ports="80,443,8080", additional_args="-g")
+    assert res["success"] is True
+    assert captured["cmd"] == ["rustscan", "-a", "10.0.0.5", "-p", "80,443,8080", "-g"]
+
+
+def test_rustscan_scan_handler_invocation_range_ports(monkeypatch):
+    captured = _mock_execute(monkeypatch)
+    tool = ToolRegistry.get("rustscan_scan")
+
+    res = tool.handler(target="10.0.0.5", ports="1-1000")
+    assert res["success"] is True
+    assert captured["cmd"] == ["rustscan", "-a", "10.0.0.5", "-r", "1-1000"]
+
+
 def test_masscan_scan_handler_invocation(monkeypatch):
     captured = _mock_execute(monkeypatch)
     tool = ToolRegistry.get("masscan_scan")
@@ -126,8 +146,8 @@ def test_enum4linux_ng_scan_handler_invocation(monkeypatch):
     )
     assert res["success"] is True
     assert captured["cmd"] == [
-        "enum4linux-ng", "10.0.0.1", "-u", "admin", "-p", "pass123", "-d", "CORP",
-        "-A", "S,U,P", "--verbose",
+        "enum4linux-ng", "10.0.0.1", "-u", "admin", "-p", "pass123", "-w", "CORP",
+        "-S", "-U", "-P", "--verbose",
     ]
 
 
@@ -182,7 +202,7 @@ def test_responder_capture_handler_invocation(monkeypatch):
         fingerprint=True, duration=60, additional_args="--verbose",
     )
     assert res["success"] is True
-    assert captured["cmd"] == ["timeout", "60", "responder", "-I", "eth0", "-A", "-w", "-F", "-f", "--verbose"]
+    assert captured["cmd"] == ["timeout", "60", "responder", "-I", "eth0", "-A", "-w", "-F", "--verbose"]
 
 
 def test_rpcclient_enum_handler_invocation_authenticated(monkeypatch):

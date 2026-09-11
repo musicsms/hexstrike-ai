@@ -138,7 +138,7 @@ def test_ropper_scan_handler_invocation(monkeypatch):
     res = tool.handler(binary="/tmp/target", gadget_type="jop", quality=3, arch="x86_64", search_string="pop rdi", additional_args="--nocolor")
     assert res["success"] is True
     assert captured["cmd"] == [
-        "ropper", "--file", "/tmp/target", "--jop",
+        "ropper", "--file", "/tmp/target", "--type", "jop",
         "--quality", "3", "--arch", "x86_64", "--search", "pop rdi", "--nocolor",
     ]
 
@@ -149,7 +149,7 @@ def test_ropper_scan_handler_invocation_defaults(monkeypatch):
 
     res = tool.handler(binary="/tmp/target")
     assert res["success"] is True
-    assert captured["cmd"] == ["ropper", "--file", "/tmp/target", "--rop"]
+    assert captured["cmd"] == ["ropper", "--file", "/tmp/target", "--type", "rop"]
 
 
 def test_pwninit_setup_handler_invocation(monkeypatch):
@@ -162,7 +162,7 @@ def test_pwninit_setup_handler_invocation(monkeypatch):
     assert res["success"] is True
     assert captured["cmd"] == [
         "pwninit", "--bin", "/tmp/target", "--libc", "/tmp/libc.so.6",
-        "--ld", "/tmp/ld.so", "--template", "python", "--force",
+        "--ld", "/tmp/ld.so", "--force",
     ]
 
 
@@ -170,9 +170,18 @@ def test_pwninit_setup_handler_invocation_no_template(monkeypatch):
     captured = _mock_execute(monkeypatch)
     tool = ToolRegistry.get("pwninit_setup")
 
-    res = tool.handler(binary="/tmp/target", template_type=None)
+    res = tool.handler(binary="/tmp/target")
     assert res["success"] is True
     assert captured["cmd"] == ["pwninit", "--bin", "/tmp/target"]
+
+
+def test_pwninit_setup_handler_invocation_with_template_path(monkeypatch):
+    captured = _mock_execute(monkeypatch)
+    tool = ToolRegistry.get("pwninit_setup")
+
+    res = tool.handler(binary="/tmp/target", template_path="/tmp/custom_template.py")
+    assert res["success"] is True
+    assert captured["cmd"] == ["pwninit", "--bin", "/tmp/target", "--template-path", "/tmp/custom_template.py"]
 
 
 def test_one_gadget_find_handler_invocation(monkeypatch):
@@ -403,9 +412,9 @@ def test_libc_database_lookup_handler_invocation_find(monkeypatch):
     assert tool.category == "binary"
     assert tool.endpoint == "/api/tools/libc-database"
 
-    res = tool.handler(action="find", symbols="printf:0x64 system:0x123", additional_args="-v")
+    res = tool.handler(action="find", symbols="printf 0x64 system 0x123", additional_args="-v")
     assert res["success"] is True
-    assert captured["cmd"] == ["./find", "printf:0x64 system:0x123", "-v"]
+    assert captured["cmd"] == ["./find", "printf", "0x64", "system", "0x123", "-v"]
     assert captured["kwargs"]["cwd"] == "/opt/libc-database"
 
 

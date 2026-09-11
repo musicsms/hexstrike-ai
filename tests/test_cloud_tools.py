@@ -27,7 +27,7 @@ def test_prowler_scan_handler_invocation(monkeypatch, tmp_path):
     output_dir = str(tmp_path / "prowler_output")
     res = tool.handler(
         provider="aws", profile="myprofile", region="us-east-1", checks="check1,check2",
-        output_dir=output_dir, output_format="json", additional_args="-M csv",
+        output_dir=output_dir, output_format="json-ocsf", additional_args="-M csv",
     )
     assert res["success"] is True
     assert captured["cmd"] == [
@@ -36,7 +36,7 @@ def test_prowler_scan_handler_invocation(monkeypatch, tmp_path):
         "--region", "us-east-1",
         "--checks", "check1,check2",
         "--output-directory", output_dir,
-        "--output-format", "json",
+        "--output-formats", "json-ocsf",
         "-M", "csv",
     ]
     assert res["output_directory"] == output_dir
@@ -152,7 +152,7 @@ def test_kube_bench_scan_handler_invocation(monkeypatch):
     res = tool.handler(targets="master,node", version="1.23", config_dir="/etc/kube-bench", output_format="json", additional_args="-v")
     assert res["success"] is True
     assert captured["cmd"] == [
-        "kube-bench", "--targets", "master,node", "--version", "1.23", "--config-dir", "/etc/kube-bench",
+        "kube-bench", "run", "--targets", "master,node", "--version", "1.23", "--config-dir", "/etc/kube-bench",
         "--outputfile", "/tmp/kube-bench-results.json", "--json", "-v",
     ]
 
@@ -163,7 +163,7 @@ def test_kube_bench_scan_handler_invocation_non_json_format(monkeypatch):
 
     res = tool.handler(output_format="junit")
     assert res["success"] is True
-    assert captured["cmd"] == ["kube-bench", "--outputfile", "/tmp/kube-bench-results.junit", "--json"]
+    assert captured["cmd"] == ["kube-bench", "run", "--outputfile", "/tmp/kube-bench-results.junit", "--json"]
 
 
 def test_docker_bench_security_scan_handler_invocation(monkeypatch):
@@ -190,7 +190,7 @@ def test_falco_scan_handler_invocation(monkeypatch):
 
     res = tool.handler(config_file="/tmp/falco.yaml", rules_file="/tmp/rules.yaml", output_format="json", duration=30, additional_args="-v")
     assert res["success"] is True
-    assert captured["cmd"] == ["timeout", "30", "falco", "--config", "/tmp/falco.yaml", "--rules", "/tmp/rules.yaml", "--json", "-v"]
+    assert captured["cmd"] == ["timeout", "30", "falco", "-c", "/tmp/falco.yaml", "-r", "/tmp/rules.yaml", "-o", "json_output=true", "-v"]
 
 
 def test_falco_scan_handler_invocation_non_json_format(monkeypatch):
@@ -199,7 +199,7 @@ def test_falco_scan_handler_invocation_non_json_format(monkeypatch):
 
     res = tool.handler(output_format="text")
     assert res["success"] is True
-    assert "--json" not in captured["cmd"]
+    assert "-o" not in captured["cmd"]
 
 
 def test_clair_scan_handler_invocation(monkeypatch):
@@ -243,8 +243,8 @@ def test_terrascan_scan_handler_invocation(monkeypatch):
     )
     assert res["success"] is True
     assert captured["cmd"] == [
-        "terrascan", "scan", "-t", "terraform", "-d", "/tmp/iac",
-        "-p", "aws", "-o", "json", "--severity", "HIGH", "--non-recursive",
+        "terrascan", "scan", "-d", "/tmp/iac",
+        "-i", "terraform", "-t", "aws", "-o", "json", "--severity", "HIGH", "--non-recursive",
     ]
 
 

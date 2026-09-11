@@ -21,7 +21,7 @@ def amass_enum(domain: str, additional_args: Optional[str] = None) -> Dict[str, 
     endpoint="/api/tools/hakrawler"
 )
 def hakrawler_crawl(url: str, depth: int = 2, forms: bool = True, robots: bool = True, sitemap: bool = True, wayback: bool = False, additional_args: Optional[str] = None) -> Dict[str, Any]:
-    cmd = ["hakrawler", "-url", url, "-d", str(depth)]
+    cmd = ["hakrawler", "-d", str(depth)]
     if forms:
         cmd.append("-s")
     if robots or sitemap or wayback:
@@ -29,4 +29,4 @@ def hakrawler_crawl(url: str, depth: int = 2, forms: bool = True, robots: bool =
     cmd.append("-u")
     if additional_args:
         cmd.extend(additional_args.split())
-    return run_tool_command(cmd)
+    return run_tool_command(cmd, stdin_input=f"{url}\n")

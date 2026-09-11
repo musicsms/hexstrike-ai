@@ -10,6 +10,7 @@ def _mock_execute(monkeypatch):
 
     def fake_execute(cmd, **kwargs):
         captured["cmd"] = cmd
+        captured["kwargs"] = kwargs
         return {"success": True, "command": " ".join(cmd), "output": "", "cached": False}
 
     monkeypatch.setattr(default_process_manager, "execute_command", fake_execute)
@@ -46,7 +47,8 @@ def test_hakrawler_crawl_handler_invocation_defaults(monkeypatch):
 
     res = tool.handler(url="https://example.com")
     assert res["success"] is True
-    assert captured["cmd"] == ["hakrawler", "-url", "https://example.com", "-d", "2", "-s", "-subs", "-u"]
+    assert captured["cmd"] == ["hakrawler", "-d", "2", "-s", "-subs", "-u"]
+    assert captured["kwargs"]["stdin_input"] == "https://example.com\n"
 
 
 def test_hakrawler_crawl_handler_invocation_no_flags(monkeypatch):
@@ -55,7 +57,8 @@ def test_hakrawler_crawl_handler_invocation_no_flags(monkeypatch):
 
     res = tool.handler(url="https://example.com", depth=5, forms=False, robots=False, sitemap=False, wayback=False, additional_args="-t 20")
     assert res["success"] is True
-    assert captured["cmd"] == ["hakrawler", "-url", "https://example.com", "-d", "5", "-u", "-t", "20"]
+    assert captured["cmd"] == ["hakrawler", "-d", "5", "-u", "-t", "20"]
+    assert captured["kwargs"]["stdin_input"] == "https://example.com\n"
 
 
 def test_hakrawler_crawl_handler_invocation_wayback_only(monkeypatch):
@@ -64,7 +67,8 @@ def test_hakrawler_crawl_handler_invocation_wayback_only(monkeypatch):
 
     res = tool.handler(url="https://example.com", forms=False, robots=False, sitemap=False, wayback=True)
     assert res["success"] is True
-    assert captured["cmd"] == ["hakrawler", "-url", "https://example.com", "-d", "2", "-subs", "-u"]
+    assert captured["cmd"] == ["hakrawler", "-d", "2", "-subs", "-u"]
+    assert captured["kwargs"]["stdin_input"] == "https://example.com\n"
 
 
 def test_osint_category_has_2_tools():

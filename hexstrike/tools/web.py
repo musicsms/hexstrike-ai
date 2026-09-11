@@ -4,7 +4,7 @@ from typing import Dict, Any, List, Optional, Annotated
 from pydantic import Field
 import requests
 from hexstrike.core.registry import ToolRegistry
-from hexstrike.tools.base import run_tool_command
+from hexstrike.tools.base import run_tool_command, resolve_binary
 
 @ToolRegistry.register(
     name="ffuf_fuzz",
@@ -165,7 +165,9 @@ def gau_discover(domain: str, providers: str = "wayback,commoncrawl,otx,urlscan"
     endpoint="/api/tools/httpx"
 )
 def httpx_probe(target: str, probe: bool = True, tech_detect: bool = False, status_code: bool = False, content_length: bool = False, title: bool = False, web_server: bool = False, threads: int = 50, additional_args: Optional[str] = None) -> Dict[str, Any]:
-    cmd = ["httpx", "-l", target, "-t", str(threads)]
+    # Kali packages ProjectDiscovery's recon tool as "httpx-toolkit" since
+    # "httpx" on PATH there is python3-httpx's unrelated HTTP-client CLI.
+    cmd = [resolve_binary("httpx", ["httpx-toolkit", "httpx"]), "-u", target, "-t", str(threads)]
     if probe:
         cmd.append("-probe")
     if tech_detect:
@@ -373,10 +375,10 @@ def zap_scan(
             cmd.extend(["-config", f"api.key={api_key}"])
     else:
         cmd = ["zaproxy", "-cmd", "-quickurl", target]
-        if format:
-            cmd.extend(["-quickout", format])
         if output_file:
-            cmd.extend(["-quickprogress", "-dir", output_file])
+            cmd.extend(["-quickout", output_file])
+        elif format:
+            cmd.extend(["-quickout", f"zap_scan_report.{format}"])
         if api_key:
             cmd.extend(["-config", f"api.key={api_key}"])
     if additional_args:

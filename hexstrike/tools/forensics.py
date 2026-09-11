@@ -2,7 +2,7 @@ from pathlib import Path
 from typing import Dict, Any, Optional, Annotated
 from pydantic import Field
 from hexstrike.core.registry import ToolRegistry
-from hexstrike.tools.base import run_tool_command
+from hexstrike.tools.base import run_tool_command, resolve_binary
 
 @ToolRegistry.register(
     name="binwalk_scan",
@@ -121,7 +121,9 @@ def volatility3_scan(
     output_file: Optional[str] = None,
     additional_args: Optional[str] = None,
 ) -> Dict[str, Any]:
-    cmd = ["vol.py", "-f", memory_file, plugin]
+    # "vol" is the console-script name from a pip install; "vol.py" is the
+    # launcher used when running from a volatility3 source checkout.
+    cmd = [resolve_binary("volatility3", ["vol", "vol.py"]), "-f", memory_file, plugin]
     if output_file:
         cmd.extend(["-o", output_file])
     if additional_args:

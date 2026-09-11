@@ -103,7 +103,9 @@ def test_volatility3_scan_handler_invocation(monkeypatch):
 
     res = tool.handler(memory_file="/tmp/mem.dmp", plugin="windows.pslist", output_file="/tmp/out.txt", additional_args="-v")
     assert res["success"] is True
-    assert captured["cmd"] == ["vol.py", "-f", "/tmp/mem.dmp", "windows.pslist", "-o", "/tmp/out.txt", "-v"]
+    # is_tool_available is mocked True for everything, so resolve_binary picks
+    # the first candidate ("vol", the pip console-script name) deterministically.
+    assert captured["cmd"] == ["vol", "-f", "/tmp/mem.dmp", "windows.pslist", "-o", "/tmp/out.txt", "-v"]
 
 
 def test_forensics_category_has_6_tools():

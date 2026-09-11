@@ -34,7 +34,12 @@ def nmap_scan(
 def rustscan_scan(target: str, ports: Optional[str] = None, additional_args: Optional[str] = None) -> Dict[str, Any]:
     cmd = ["rustscan", "-a", target]
     if ports:
-        cmd.extend(["-r", ports])
+        # rustscan takes a comma list via -p ("80,443") or a start-end range via -r ("1-1000");
+        # the two formats are mutually exclusive and each errors on the other's syntax.
+        if "," not in ports and "-" in ports:
+            cmd.extend(["-r", ports])
+        else:
+            cmd.extend(["-p", ports])
     if additional_args:
         cmd.extend(additional_args.split())
     return run_tool_command(cmd)
@@ -134,18 +139,15 @@ def enum4linux_ng_scan(target: str, username: Optional[str] = None, password: Op
     if password:
         cmd.extend(["-p", password])
     if domain:
-        cmd.extend(["-d", domain])
-    enum_options = []
+        cmd.extend(["-w", domain])
     if shares:
-        enum_options.append("S")
+        cmd.append("-S")
     if users:
-        enum_options.append("U")
+        cmd.append("-U")
     if groups:
-        enum_options.append("G")
+        cmd.append("-G")
     if policy:
-        enum_options.append("P")
-    if enum_options:
-        cmd.extend(["-A", ",".join(enum_options)])
+        cmd.append("-P")
     if additional_args:
         cmd.extend(additional_args.split())
     return run_tool_command(cmd)
@@ -221,8 +223,8 @@ def responder_capture(interface: str = "eth0", analyze: bool = False, wpad: bool
         cmd.append("-w")
     if force_wpad_auth:
         cmd.append("-F")
-    if fingerprint:
-        cmd.append("-f")
+    # Note: current Responder builds (lgandx/Responder) removed -f/--fingerprint;
+    # passing it makes Responder exit with "no such option: -f", so it's a no-op here.
     if additional_args:
         cmd.extend(additional_args.split())
     return run_tool_command(cmd)

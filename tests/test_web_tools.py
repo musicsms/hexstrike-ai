@@ -140,8 +140,11 @@ def test_httpx_probe_handler_invocation(monkeypatch):
         content_length=True, title=True, web_server=True, threads=25, additional_args="-json",
     )
     assert res["success"] is True
+    # resolve_binary picks "httpx-toolkit" first (Kali's name for the real
+    # recon tool, since "httpx" collides with python3-httpx there); with
+    # is_tool_available mocked True this is deterministic.
     assert captured["cmd"] == [
-        "httpx", "-l", "http://x.com", "-t", "25",
+        "httpx-toolkit", "-u", "http://x.com", "-t", "25",
         "-probe", "-tech-detect", "-sc", "-cl", "-title", "-server", "-json",
     ]
 
@@ -276,12 +279,25 @@ def test_zap_scan_handler_invocation_quickscan(monkeypatch):
     assert tool is not None
     assert tool.endpoint == "/api/tools/zap"
 
-    res = tool.handler(target="http://x.com", format="xml", output_file="/tmp/out", api_key="KEY123", additional_args="-cmd")
+    res = tool.handler(target="http://x.com", format="xml", output_file="/tmp/out.xml", api_key="KEY123", additional_args="-cmd")
     assert res["success"] is True
     assert captured["cmd"] == [
         "zaproxy", "-cmd", "-quickurl", "http://x.com",
-        "-quickout", "xml", "-quickprogress", "-dir", "/tmp/out",
+        "-quickout", "/tmp/out.xml",
         "-config", "api.key=KEY123", "-cmd",
+    ]
+
+
+def test_zap_scan_handler_invocation_quickscan_format_only(monkeypatch):
+    captured = _mock_execute(monkeypatch)
+    tool = ToolRegistry.get("zap_scan")
+    assert tool is not None
+
+    res = tool.handler(target="http://x.com", format="json")
+    assert res["success"] is True
+    assert captured["cmd"] == [
+        "zaproxy", "-cmd", "-quickurl", "http://x.com",
+        "-quickout", "zap_scan_report.json",
     ]
 
 

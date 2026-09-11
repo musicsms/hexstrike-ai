@@ -16,7 +16,7 @@ def prowler_scan(
     region: Optional[str] = None,
     checks: Optional[str] = None,
     output_dir: str = "/tmp/prowler_output",
-    output_format: str = "json",
+    output_format: Annotated[str, Field(description="Prowler --output-formats value: 'csv', 'json-asff', 'json-ocsf', 'html', or 'sarif'")] = "json-ocsf",
     additional_args: Optional[str] = None,
 ) -> Dict[str, Any]:
     Path(output_dir).mkdir(parents=True, exist_ok=True)
@@ -28,7 +28,7 @@ def prowler_scan(
     if checks:
         cmd.extend(["--checks", checks])
     cmd.extend(["--output-directory", output_dir])
-    cmd.extend(["--output-format", output_format])
+    cmd.extend(["--output-formats", output_format])
     if additional_args:
         cmd.extend(additional_args.split())
     result = run_tool_command(cmd)
@@ -123,7 +123,7 @@ def kube_hunter_scan(
     target: Annotated[Optional[str], Field(description="Remote host/IP to scan (takes priority over remote/cidr/interface)")] = None,
     remote: Annotated[Optional[str], Field(description="Remote host/IP to scan; only used if target is not set")] = None,
     cidr: Annotated[Optional[str], Field(description="CIDR range to scan, e.g. '10.0.0.0/24'; only used if target/remote are not set")] = None,
-    interface: Annotated[Optional[str], Field(description="Local network interface to scan on, e.g. 'eth0'; only used if target/remote/cidr are not set")] = None,
+    interface: Annotated[Optional[str], Field(description="Truthy to scan on all local network interfaces (kube-hunter's --interface is a boolean toggle, it does not take a specific interface name); only used if target/remote/cidr are not set")] = None,
     active: bool = False,
     report: str = "json",
     additional_args: Optional[str] = None,
@@ -136,7 +136,7 @@ def kube_hunter_scan(
     elif cidr:
         cmd.extend(["--cidr", cidr])
     elif interface:
-        cmd.extend(["--interface", interface])
+        cmd.append("--interface")
     else:
         cmd.append("--pod")
     if active:
@@ -154,7 +154,7 @@ def kube_hunter_scan(
     endpoint="/api/tools/kube-bench"
 )
 def kube_bench_scan(targets: Optional[str] = None, version: Optional[str] = None, config_dir: Optional[str] = None, output_format: str = "json", additional_args: Optional[str] = None) -> Dict[str, Any]:
-    cmd = ["kube-bench"]
+    cmd = ["kube-bench", "run"]
     if targets:
         cmd.extend(["--targets", targets])
     if version:
@@ -196,11 +196,11 @@ def docker_bench_security_scan(checks: Optional[str] = None, exclude: Optional[s
 def falco_scan(config_file: str = "/etc/falco/falco.yaml", rules_file: Optional[str] = None, output_format: str = "json", duration: int = 60, additional_args: Optional[str] = None) -> Dict[str, Any]:
     cmd = ["timeout", str(duration), "falco"]
     if config_file:
-        cmd.extend(["--config", config_file])
+        cmd.extend(["-c", config_file])
     if rules_file:
-        cmd.extend(["--rules", rules_file])
+        cmd.extend(["-r", rules_file])
     if output_format == "json":
-        cmd.append("--json")
+        cmd.extend(["-o", "json_output=true"])
     if additional_args:
         cmd.extend(additional_args.split())
     return run_tool_command(cmd)
@@ -262,9 +262,11 @@ def terrascan_scan(
     severity: Annotated[Optional[str], Field(description="Minimum severity to report: 'low', 'medium', or 'high'")] = None,
     additional_args: Optional[str] = None,
 ) -> Dict[str, Any]:
-    cmd = ["terrascan", "scan", "-t", scan_type, "-d", iac_dir]
+    cmd = ["terrascan", "scan", "-d", iac_dir]
+    if scan_type and scan_type != "all":
+        cmd.extend(["-i", scan_type])
     if policy_type:
-        cmd.extend(["-p", policy_type])
+        cmd.extend(["-t", policy_type])
     if output_format:
         cmd.extend(["-o", output_format])
     if severity:
