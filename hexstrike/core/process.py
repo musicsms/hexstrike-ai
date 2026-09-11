@@ -39,17 +39,26 @@ class ProcessManager:
 
         self.cache_misses += 1
         start_time = time.time()
+        proc = None
         try:
-            run_kwargs = dict(stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=timeout)
+            popen_kwargs = dict(stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
             if stdin_input is not None:
-                run_kwargs["input"] = stdin_input
+                popen_kwargs["stdin"] = subprocess.PIPE
             if cwd is not None:
-                run_kwargs["cwd"] = cwd
-            res = subprocess.run(command, **run_kwargs)
+                popen_kwargs["cwd"] = cwd
+            proc = subprocess.Popen(command, **popen_kwargs)
+
+            try:
+                stdout, stderr = proc.communicate(input=stdin_input, timeout=timeout)
+            except subprocess.TimeoutExpired:
+                proc.kill()
+                proc.communicate()
+                raise
+
             elapsed = f"{time.time() - start_time:.2f}s"
-            success = (res.returncode == 0)
-            output = res.stdout
-            error = res.stderr if not success else None
+            success = (proc.returncode == 0)
+            output = stdout
+            error = stderr if not success else None
 
             result_data = {
                 "success": success,
