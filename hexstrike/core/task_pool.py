@@ -4,20 +4,26 @@ import threading
 from concurrent.futures import ThreadPoolExecutor
 from typing import Dict, Any, Optional
 from hexstrike.core.registry import ToolRegistry
-from hexstrike.core.config import TASK_POOL_MAX_WORKERS
+from hexstrike.core.config import TASK_POOL_MAX_WORKERS, TASK_POOL_MAX_TRACKED_TASKS
 from hexstrike.core.process import _current_task_id, default_process_manager
 
 
 class TaskPool:
-    def __init__(self, max_workers: int = TASK_POOL_MAX_WORKERS):
+    def __init__(self, max_workers: int = TASK_POOL_MAX_WORKERS, max_tracked_tasks: int = TASK_POOL_MAX_TRACKED_TASKS):
         self._executor = ThreadPoolExecutor(max_workers=max_workers)
         self._tasks: Dict[str, Dict[str, Any]] = {}
         self._lock = threading.RLock()
+        self._max_tracked_tasks = max_tracked_tasks
+        self._submit_count = 0
 
     def submit(self, tool_name: str, params: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         spec = ToolRegistry.get(tool_name)
         if spec is None:
             return {"success": False, "error": f"Unknown tool: {tool_name}"}
+
+        with self._lock:
+            if len(self._tasks) >= self._max_tracked_tasks:
+                return {"success": False, "error": "Task queue is full, try again later"}
 
         task_id = str(uuid.uuid4())
         call_params = params or {}
@@ -37,10 +43,12 @@ class TaskPool:
                 "submitted_at": time.time(),
                 "future": future,
             }
-            self._prune_old_completed()
+            self._submit_count += 1
+            if self._submit_count % 50 == 0:
+                self._prune_old_completed()
         return {"success": True, "task_id": task_id}
 
-    def _task_view(self, task_id: str, entry: Dict[str, Any]) -> Dict[str, Any]:
+    def _task_view(self, task_id: str, entry: Dict[str, Any], include_result: bool = True) -> Dict[str, Any]:
         future = entry["future"]
         view = {
             "task_id": task_id,
@@ -54,10 +62,12 @@ class TaskPool:
             exc = future.exception()
             if exc is not None:
                 view["status"] = "failed"
-                view["error"] = str(exc)
+                if include_result:
+                    view["error"] = str(exc)
             else:
                 view["status"] = "completed"
-                view["result"] = future.result()
+                if include_result:
+                    view["result"] = future.result()
         elif future.running():
             view["status"] = "running"
         else:
@@ -74,7 +84,7 @@ class TaskPool:
     def list_tasks(self) -> Dict[str, Any]:
         with self._lock:
             items = list(self._tasks.items())
-        return {"success": True, "tasks": [self._task_view(tid, e) for tid, e in items]}
+        return {"success": True, "tasks": [self._task_view(tid, e, include_result=False) for tid, e in items]}
 
     def terminate(self, task_id: str) -> Dict[str, Any]:
         with self._lock:

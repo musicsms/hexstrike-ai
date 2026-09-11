@@ -44,7 +44,7 @@ def task_list() -> Dict[str, Any]:
 @ToolRegistry.register(
     name="task_terminate",
     category="process",
-    description="Cancel a queued task, or kill the OS subprocess(es) a running task spawned. A running task's status settles to 'failed' shortly after this call, not instantly - it is not force-killed synchronously.",
+    description="Cancel a queued task, or kill the OS subprocess(es) a running task spawned. A running task's status settles to 'completed' (with result.success == False) shortly after this call, not instantly - it is not force-killed synchronously.",
     endpoint="/api/tools/task-terminate"
 )
 def task_terminate(
