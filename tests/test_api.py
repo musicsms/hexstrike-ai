@@ -45,6 +45,21 @@ def test_tool_execution_route_get_method_uses_query_params(client, monkeypatch):
     data = res.get_json()
     assert data["success"] is True
 
+def test_tool_execution_route_ignores_unknown_params(client, monkeypatch):
+    """A caller sending a legacy/unsupported field (e.g. use_recovery from the
+    pre-refactor monolith's FailureRecoverySystem) should still get a real
+    scan, not a 400 for an argument this tool never had."""
+    from hexstrike.core.process import default_process_manager
+    monkeypatch.setattr("hexstrike.tools.base.is_tool_available", lambda name: True)
+    monkeypatch.setattr(default_process_manager, "execute_command", lambda cmd, **kwargs: {
+        "success": True, "command": " ".join(cmd), "output": "ok", "cached": False
+    })
+    res = client.post("/api/tools/nmap", json={"target": "127.0.0.1", "use_recovery": True})
+    assert res.status_code == 200
+    data = res.get_json()
+    assert data["success"] is True
+    assert data["ignored_params"] == ["use_recovery"]
+
 def test_tool_execution_route_missing_required_argument_returns_400(client):
     res = client.post("/api/tools/nmap", json={})
     assert res.status_code == 400

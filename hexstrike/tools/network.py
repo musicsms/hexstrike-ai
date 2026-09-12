@@ -13,6 +13,7 @@ def nmap_scan(
     target: str,
     scan_type: Annotated[str, Field(description="Raw Nmap scan flag(s), e.g. '-sV' (version detection), '-sS' (SYN stealth), '-sT' (TCP connect), '-sU' (UDP)")] = "-sV",
     ports: Optional[str] = None,
+    timeout: int = 300,
     additional_args: Optional[str] = None,
 ) -> Dict[str, Any]:
     cmd = ["nmap"]
@@ -23,7 +24,7 @@ def nmap_scan(
     if additional_args:
         cmd.extend(additional_args.split())
     cmd.append(target)
-    return run_tool_command(cmd)
+    return run_tool_command(cmd, timeout=timeout)
 
 @ToolRegistry.register(
     name="rustscan_scan",

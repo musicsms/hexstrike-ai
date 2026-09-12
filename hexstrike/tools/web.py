@@ -12,11 +12,11 @@ from hexstrike.tools.base import run_tool_command, resolve_binary
     description="Fast, general-purpose web fuzzer using ffuf - fuzzes any request position (paths, params, headers, host), not limited to directory discovery",
     endpoint="/api/tools/ffuf"
 )
-def ffuf_fuzz(url: str, wordlist: str = "/usr/share/wordlists/dirb/common.txt", additional_args: Optional[str] = None) -> Dict[str, Any]:
+def ffuf_fuzz(url: str, wordlist: str = "/usr/share/wordlists/dirb/common.txt", timeout: int = 300, additional_args: Optional[str] = None) -> Dict[str, Any]:
     cmd = ["ffuf", "-u", url, "-w", wordlist]
     if additional_args:
         cmd.extend(additional_args.split())
-    return run_tool_command(cmd)
+    return run_tool_command(cmd, timeout=timeout)
 
 @ToolRegistry.register(
     name="gobuster_dir",
@@ -24,11 +24,11 @@ def ffuf_fuzz(url: str, wordlist: str = "/usr/share/wordlists/dirb/common.txt", 
     description="Directory and DNS busting using Gobuster - simple, fast wordlist-based brute-forcing; good default when you don't need recursion or extension-aware wordlists",
     endpoint="/api/tools/gobuster"
 )
-def gobuster_dir(url: str, wordlist: str = "/usr/share/wordlists/dirb/common.txt", additional_args: Optional[str] = None) -> Dict[str, Any]:
+def gobuster_dir(url: str, wordlist: str = "/usr/share/wordlists/dirb/common.txt", timeout: int = 300, additional_args: Optional[str] = None) -> Dict[str, Any]:
     cmd = ["gobuster", "dir", "-u", url, "-w", wordlist]
     if additional_args:
         cmd.extend(additional_args.split())
-    return run_tool_command(cmd)
+    return run_tool_command(cmd, timeout=timeout)
 
 @ToolRegistry.register(
     name="sqlmap_scan",
@@ -36,13 +36,13 @@ def gobuster_dir(url: str, wordlist: str = "/usr/share/wordlists/dirb/common.txt
     description="Automated SQL injection scanner using SQLMap",
     endpoint="/api/tools/sqlmap"
 )
-def sqlmap_scan(url: str, batch: bool = True, additional_args: Optional[str] = None) -> Dict[str, Any]:
+def sqlmap_scan(url: str, batch: bool = True, timeout: int = 300, additional_args: Optional[str] = None) -> Dict[str, Any]:
     cmd = ["sqlmap", "-u", url]
     if batch:
         cmd.append("--batch")
     if additional_args:
         cmd.extend(additional_args.split())
-    return run_tool_command(cmd)
+    return run_tool_command(cmd, timeout=timeout)
 
 @ToolRegistry.register(
     name="arjun_scan",
@@ -91,11 +91,11 @@ def dalfox_scan(url: Optional[str] = None, pipe_mode: bool = False, blind: bool 
     description="Directory and file brute-forcing using dirb - recursive by default; the classic, simplest option, slower than ffuf/feroxbuster on large wordlists",
     endpoint="/api/tools/dirb"
 )
-def dirb_scan(url: str, wordlist: str = "/usr/share/wordlists/dirb/common.txt", additional_args: Optional[str] = None) -> Dict[str, Any]:
+def dirb_scan(url: str, wordlist: str = "/usr/share/wordlists/dirb/common.txt", timeout: int = 300, additional_args: Optional[str] = None) -> Dict[str, Any]:
     cmd = ["dirb", url, wordlist]
     if additional_args:
         cmd.extend(additional_args.split())
-    return run_tool_command(cmd)
+    return run_tool_command(cmd, timeout=timeout)
 
 @ToolRegistry.register(
     name="dirsearch_scan",
@@ -103,13 +103,13 @@ def dirb_scan(url: str, wordlist: str = "/usr/share/wordlists/dirb/common.txt", 
     description="Advanced directory and file discovery using Dirsearch - extension-aware wordlists with recursion; a strong default choice for thorough content discovery",
     endpoint="/api/tools/dirsearch"
 )
-def dirsearch_scan(url: str, extensions: str = "php,html,js,txt,xml,json", wordlist: str = "/usr/share/wordlists/dirsearch/common.txt", threads: int = 30, recursive: bool = False, additional_args: Optional[str] = None) -> Dict[str, Any]:
+def dirsearch_scan(url: str, extensions: str = "php,html,js,txt,xml,json", wordlist: str = "/usr/share/wordlists/dirsearch/common.txt", threads: int = 30, recursive: bool = False, timeout: int = 300, additional_args: Optional[str] = None) -> Dict[str, Any]:
     cmd = ["dirsearch", "-u", url, "-e", extensions, "-w", wordlist, "-t", str(threads)]
     if recursive:
         cmd.append("-r")
     if additional_args:
         cmd.extend(additional_args.split())
-    return run_tool_command(cmd)
+    return run_tool_command(cmd, timeout=timeout)
 
 @ToolRegistry.register(
     name="dotdotpwn_scan",
@@ -134,11 +134,11 @@ def dotdotpwn_scan(
     description="Recursive content discovery using Feroxbuster - Rust-based, the fastest option here for large-scale recursive scans",
     endpoint="/api/tools/feroxbuster"
 )
-def feroxbuster_scan(url: str, wordlist: str = "/usr/share/wordlists/dirb/common.txt", threads: int = 10, additional_args: Optional[str] = None) -> Dict[str, Any]:
+def feroxbuster_scan(url: str, wordlist: str = "/usr/share/wordlists/dirb/common.txt", threads: int = 10, timeout: int = 300, additional_args: Optional[str] = None) -> Dict[str, Any]:
     cmd = ["feroxbuster", "-u", url, "-w", wordlist, "-t", str(threads)]
     if additional_args:
         cmd.extend(additional_args.split())
-    return run_tool_command(cmd)
+    return run_tool_command(cmd, timeout=timeout)
 
 @ToolRegistry.register(
     name="gau_discover",
@@ -206,7 +206,7 @@ def jaeles_scan(url: str, signatures: Optional[str] = None, config: Optional[str
     description="Next-generation web crawling and spidering using Katana",
     endpoint="/api/tools/katana"
 )
-def katana_crawl(url: str, depth: int = 3, js_crawl: bool = True, form_extraction: bool = True, output_format: str = "json", additional_args: Optional[str] = None) -> Dict[str, Any]:
+def katana_crawl(url: str, depth: int = 3, js_crawl: bool = True, form_extraction: bool = True, output_format: str = "json", timeout: int = 300, additional_args: Optional[str] = None) -> Dict[str, Any]:
     cmd = ["katana", "-u", url, "-d", str(depth)]
     if js_crawl:
         cmd.append("-jc")
@@ -216,7 +216,7 @@ def katana_crawl(url: str, depth: int = 3, js_crawl: bool = True, form_extractio
         cmd.append("-jsonl")
     if additional_args:
         cmd.extend(additional_args.split())
-    return run_tool_command(cmd)
+    return run_tool_command(cmd, timeout=timeout)
 
 @ToolRegistry.register(
     name="nikto_scan",
@@ -224,11 +224,11 @@ def katana_crawl(url: str, depth: int = 3, js_crawl: bool = True, form_extractio
     description="Web server vulnerability scanning using Nikto - broad but noisy checks for outdated software/server misconfigurations",
     endpoint="/api/tools/nikto"
 )
-def nikto_scan(target: str, additional_args: Optional[str] = None) -> Dict[str, Any]:
+def nikto_scan(target: str, timeout: int = 300, additional_args: Optional[str] = None) -> Dict[str, Any]:
     cmd = ["nikto", "-h", target]
     if additional_args:
         cmd.extend(additional_args.split())
-    return run_tool_command(cmd)
+    return run_tool_command(cmd, timeout=timeout)
 
 @ToolRegistry.register(
     name="nuclei_scan",
@@ -241,6 +241,7 @@ def nuclei_scan(
     severity: Annotated[Optional[str], Field(description="Comma-separated severity filter: 'info', 'low', 'medium', 'high', 'critical'")] = None,
     tags: Annotated[Optional[str], Field(description="Comma-separated Nuclei template tags to include, e.g. 'cve,exposure,misconfig'")] = None,
     template: Annotated[Optional[str], Field(description="Path to a specific Nuclei template or template directory to run, instead of the default set")] = None,
+    timeout: int = 300,
     additional_args: Optional[str] = None,
 ) -> Dict[str, Any]:
     cmd = ["nuclei", "-u", target]
@@ -252,7 +253,7 @@ def nuclei_scan(
         cmd.extend(["-t", template])
     if additional_args:
         cmd.extend(additional_args.split())
-    return run_tool_command(cmd)
+    return run_tool_command(cmd, timeout=timeout)
 
 @ToolRegistry.register(
     name="paramspider_mine",
