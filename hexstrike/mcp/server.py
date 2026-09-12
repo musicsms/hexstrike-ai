@@ -19,12 +19,28 @@ def setup_mcp_server(client: HexStrikeClient) -> FastMCP:
         handler = spec.handler
 
         def make_tool(func, ep):
+            handler_sig = inspect.signature(func)
+            # Expose use_recovery as an extra, optional parameter in the
+            # MCP tool schema, on top of the handler's own real signature —
+            # the API's own default (True, matching the legacy monolith)
+            # applies when a caller doesn't set it, so it's only forwarded
+            # when explicitly given.
+            exposed_sig = handler_sig.replace(parameters=[
+                *handler_sig.parameters.values(),
+                inspect.Parameter("use_recovery", inspect.Parameter.KEYWORD_ONLY, default=False, annotation=bool),
+            ])
+
             @functools.wraps(func)
             def tool_func(*args, **kwargs):
-                sig = inspect.signature(func)
-                bound = sig.bind(*args, **kwargs)
+                use_recovery = kwargs.pop("use_recovery", False)
+                bound = handler_sig.bind(*args, **kwargs)
                 bound.apply_defaults()
-                return client.execute_tool(ep, bound.arguments)
+                arguments = dict(bound.arguments)
+                if use_recovery:
+                    arguments["use_recovery"] = True
+                return client.execute_tool(ep, arguments)
+
+            tool_func.__signature__ = exposed_sig
             return tool_func
 
         wrapped = make_tool(handler, endpoint)

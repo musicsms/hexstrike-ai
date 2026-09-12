@@ -32,6 +32,55 @@ def test_mcp_tools_expose_name_and_description_from_registry():
     assert mcp_tool.description == nmap.description
     assert mcp_tool.description is not None
 
+def test_mcp_tool_exposes_use_recovery_parameter():
+    client = HexStrikeClient(server_url="http://127.0.0.1:8888")
+    mcp = setup_mcp_server(client)
+
+    async def list_tools():
+        return await mcp.list_tools()
+
+    tools = asyncio.run(list_tools())
+    tools_by_name = {t.name: t for t in tools}
+    nmap_tool = tools_by_name["nmap_scan"]
+    assert "use_recovery" in nmap_tool.inputSchema["properties"]
+
+def test_mcp_tool_call_forwards_use_recovery_when_true(monkeypatch):
+    client = HexStrikeClient(server_url="http://127.0.0.1:8888")
+    captured = {}
+
+    def fake_execute_tool(endpoint, params):
+        captured["params"] = params
+        return {"success": True, "output": "ok"}
+
+    monkeypatch.setattr(client, "execute_tool", fake_execute_tool)
+    mcp = setup_mcp_server(client)
+
+    async def call():
+        return await mcp.call_tool("nmap_scan", {"target": "127.0.0.1", "use_recovery": True})
+
+    asyncio.run(call())
+    assert captured["params"]["use_recovery"] is True
+    assert captured["params"]["target"] == "127.0.0.1"
+
+def test_mcp_tool_call_omits_use_recovery_when_not_specified(monkeypatch):
+    client = HexStrikeClient(server_url="http://127.0.0.1:8888")
+    captured = {}
+
+    def fake_execute_tool(endpoint, params):
+        captured["params"] = params
+        return {"success": True, "output": "ok"}
+
+    monkeypatch.setattr(client, "execute_tool", fake_execute_tool)
+    mcp = setup_mcp_server(client)
+
+    async def call():
+        return await mcp.call_tool("nmap_scan", {"target": "127.0.0.1"})
+
+    asyncio.run(call())
+    # Not sending use_recovery lets the API's own default (True, matching
+    # legacy) apply server-side — this MCP layer must not inject a value.
+    assert "use_recovery" not in captured["params"]
+
 def test_mcp_tool_call_binds_arguments_and_applies_defaults_before_dispatch(monkeypatch):
     client = HexStrikeClient(server_url="http://127.0.0.1:8888")
     captured = {}
