@@ -167,3 +167,27 @@ def test_tool_execution_route_get_method_use_recovery_string_false_is_falsy(clie
     data = res.get_json()
     assert "recovery_info" not in data
     assert calls["count"] == 1
+
+
+def test_tool_execution_route_get_method_use_recovery_string_true_is_truthy(client, monkeypatch):
+    from hexstrike.core.process import default_process_manager
+    import hexstrike.core.recovery as recovery_module
+    monkeypatch.setattr("hexstrike.tools.base.is_tool_available", lambda name: True)
+    monkeypatch.setattr(recovery_module.time, "sleep", lambda seconds: None)
+
+    calls = {"count": 0}
+
+    def fake_execute(cmd, **kwargs):
+        calls["count"] += 1
+        if calls["count"] == 1:
+            return {"success": False, "command": " ".join(cmd), "output": "", "error": "rate limit exceeded", "cached": False}
+        return {"success": True, "command": " ".join(cmd), "output": "ok", "cached": False}
+
+    monkeypatch.setattr(default_process_manager, "execute_command", fake_execute)
+
+    res = client.get("/api/tools/nmap?target=127.0.0.1&use_recovery=true")
+    assert res.status_code == 200
+    data = res.get_json()
+    assert data["success"] is True
+    assert data["recovery_info"]["attempts_made"] == 2
+    assert calls["count"] == 2

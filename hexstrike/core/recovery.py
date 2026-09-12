@@ -1,3 +1,10 @@
+"""Ports the legacy monolith's FailureRecoverySystem/IntelligentErrorHandler
+into the modular architecture: error classification, retry/backoff, and
+parameter adjustment for the opt-in `use_recovery` API flag.
+
+See docs/superpowers/specs/2026-09-11-failure-recovery-system-design.md.
+"""
+
 import re
 import time
 import inspect
@@ -269,6 +276,14 @@ def adjust_params(spec: ToolSpec, error_type: ErrorType, kwargs: Dict[str, Any])
             existing = adjusted.get("additional_args") or ""
             adjusted["additional_args"] = f"{existing} {value}".strip()
             continue
+        if key == "timeout" and callable(value):
+            # Many tools use "timeout" for a per-host/per-request CLI flag,
+            # not the subprocess execution timeout (e.g. jaeles_scan,
+            # nbtscan_scan) — only widen a timeout the caller actually set,
+            # and cap the growth so retries can't compound unboundedly.
+            if key in accepted and key in kwargs:
+                adjusted[key] = min(value(adjusted.get(key)), 1800)
+            continue
         if key in accepted:
             adjusted[key] = value(adjusted.get(key)) if callable(value) else value
     return adjusted
@@ -329,9 +344,11 @@ def execute_with_recovery(spec: ToolSpec, kwargs: Dict[str, Any], max_attempts: 
 
     while attempt < max_attempts:
         attempt += 1
+        exc_obj: Optional[Exception] = None
         try:
             result = spec.handler(**current_kwargs)
         except Exception as exc:
+            exc_obj = exc
             result = {"success": False, "error": str(exc)}
         last_result = result
 
@@ -343,7 +360,7 @@ def execute_with_recovery(spec: ToolSpec, kwargs: Dict[str, Any], max_attempts: 
             }
             return result
 
-        error_type = classify_error(result.get("error") or "")
+        error_type = classify_error(result.get("error") or "", exc_obj)
         strategy = select_best_strategy(RECOVERY_STRATEGIES[error_type], attempt)
         history.append({
             "attempt": attempt,
@@ -352,11 +369,12 @@ def execute_with_recovery(spec: ToolSpec, kwargs: Dict[str, Any], max_attempts: 
         })
 
         if strategy.action == RecoveryAction.RETRY_WITH_BACKOFF:
-            delay = min(
-                strategy.parameters.get("initial_delay", 5) * (strategy.backoff_multiplier ** (attempt - 1)),
-                strategy.parameters.get("max_delay", 60),
-            )
-            time.sleep(delay)
+            if attempt < max_attempts:
+                delay = min(
+                    strategy.parameters.get("initial_delay", 5) * (strategy.backoff_multiplier ** (attempt - 1)),
+                    strategy.parameters.get("max_delay", 60),
+                )
+                time.sleep(delay)
             continue
 
         if strategy.action in (RecoveryAction.RETRY_WITH_REDUCED_SCOPE, RecoveryAction.ADJUST_PARAMETERS):
@@ -386,7 +404,7 @@ def execute_with_recovery(spec: ToolSpec, kwargs: Dict[str, Any], max_attempts: 
 
     last_result["recovery_info"] = {
         "attempts_made": attempt,
-        "recovery_applied": True,
+        "recovery_applied": len(history) > 0,
         "recovery_history": history,
     }
     return last_result

@@ -1,4 +1,3 @@
-import pytest
 from hexstrike.core.recovery import ErrorType, classify_error
 from hexstrike.core.registry import ToolSpec
 
@@ -304,3 +303,71 @@ def test_execute_with_recovery_handles_raised_exception():
     # no alternative is registered for "some_tool" so it just stops.
     assert result["success"] is False
     assert result["recovery_info"]["attempts_made"] == 1
+
+
+def test_adjust_params_generic_timeout_not_forced_when_caller_did_not_set_it():
+    def handler(target, timeout=20, additional_args=None):
+        return {"success": True}
+    spec = _fake_spec("some_future_tool", handler)
+
+    # Caller never passed "timeout" — must NOT be forced to 600 even though
+    # the handler accepts a timeout param with its own, different default.
+    result = adjust_params(spec, ErrorType.TIMEOUT, {"target": "x"})
+    assert "timeout" not in result
+
+
+def test_adjust_params_generic_timeout_caps_growth():
+    def handler(target, timeout=300, additional_args=None):
+        return {"success": True}
+    spec = _fake_spec("some_future_tool", handler)
+
+    result = adjust_params(spec, ErrorType.TIMEOUT, {"target": "x", "timeout": 1000})
+    assert result["timeout"] == 1800  # min(1000*2, 1800), not 2000
+
+
+def test_execute_with_recovery_no_sleep_on_terminal_attempt(monkeypatch):
+    sleeps = []
+    monkeypatch.setattr(recovery_module.time, "sleep", lambda seconds: sleeps.append(seconds))
+
+    def handler(target):
+        return {"success": False, "error": "rate limit exceeded"}
+
+    spec = _fake_spec("some_tool", handler)
+    result = execute_with_recovery(spec, {"target": "x"})  # default max_attempts=3
+
+    assert result["success"] is False
+    assert result["recovery_info"]["attempts_made"] == 3
+    # RATE_LIMITED picks RETRY_WITH_BACKOFF at attempts 1 and 2 (sleeps),
+    # then again at attempt 3 (RETRY_WITH_BACKOFF is the only strategy still
+    # viable — ADJUST_PARAMETERS's max_attempts=2 excludes it) but must NOT
+    # sleep since attempt 3 == max_attempts.
+    assert sleeps == [30, 45]
+
+
+def test_execute_with_recovery_uses_exception_type_shortcut_for_bare_exception():
+    def handler(target):
+        raise TimeoutError()  # empty message — classify_error("") alone would be UNKNOWN
+
+    spec = _fake_spec("some_tool", handler)
+    result = execute_with_recovery(spec, {"target": "x"}, max_attempts=1)
+
+    # TIMEOUT's attempt-1 winner is RETRY_WITH_REDUCED_SCOPE (see
+    # test_select_best_strategy_timeout_progression). UNKNOWN's attempt-1
+    # winner is ESCALATE_TO_HUMAN. Getting retry_with_reduced_scope here
+    # proves the exception object — not just its (empty) string — drove
+    # classification to TIMEOUT.
+    assert result["recovery_info"]["recovery_history"][0]["recovery_action"] == "retry_with_reduced_scope"
+
+
+def test_execute_with_recovery_suggests_real_registered_alternative():
+    real_spec = recovery_module.ToolRegistry.get("nmap_scan")
+    assert real_spec is not None
+
+    def handler(**kwargs):
+        return {"success": False, "error": "nmap: command not found"}
+
+    spec = ToolSpec(name="nmap_scan", category=real_spec.category, description="", endpoint=real_spec.endpoint, handler=handler)
+    result = execute_with_recovery(spec, {"target": "10.0.0.1"})
+
+    assert result["success"] is False
+    assert result["alternative_tool_suggested"] == "rustscan_scan"
