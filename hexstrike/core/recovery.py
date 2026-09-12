@@ -1,16 +1,21 @@
 """Ports the legacy monolith's FailureRecoverySystem/IntelligentErrorHandler
-into the modular architecture: error classification, retry/backoff, and
-parameter adjustment for the opt-in `use_recovery` API flag.
+and GracefulDegradation into the modular architecture: error classification,
+retry/backoff, parameter adjustment, and a basic-check fallback (raw port
+scan / directory HEAD probe / security-header check) for the `use_recovery`
+API flag (on by default, matching the legacy monolith).
 
 See docs/superpowers/specs/2026-09-11-failure-recovery-system-design.md.
 """
 
 import re
+import socket
 import time
 import inspect
 from dataclasses import dataclass
 from enum import Enum
 from typing import Any, Dict, List, Optional
+
+import requests
 
 from hexstrike.core.registry import ToolRegistry, ToolSpec
 
@@ -336,6 +341,167 @@ def build_escalation(
     }
 
 
+_OPERATION_MAPPING: Dict[str, str] = {
+    "nmap_scan": "network_discovery",
+    "rustscan_scan": "network_discovery",
+    "masscan_scan": "network_discovery",
+    "gobuster_dir": "web_discovery",
+    "feroxbuster_scan": "web_discovery",
+    "dirsearch_scan": "web_discovery",
+    "ffuf_fuzz": "web_discovery",
+    "nuclei_scan": "vulnerability_scanning",
+    "jaeles_scan": "vulnerability_scanning",
+    "nikto_scan": "vulnerability_scanning",
+    "subfinder": "subdomain_enumeration",
+    "amass_enum": "subdomain_enumeration",
+    "assetfinder": "subdomain_enumeration",
+}
+
+
+def _determine_operation_type(tool_name: str) -> str:
+    return _OPERATION_MAPPING.get(tool_name, "unknown_operation")
+
+
+_COMMON_PORTS = [21, 22, 23, 25, 53, 80, 110, 143, 443, 993, 995]
+
+
+def _basic_port_check(target: str) -> List[int]:
+    """Raw socket connect-scan of common ports — the "still learn something"
+    fallback when a real port scanner (nmap/rustscan/masscan) has failed and
+    exhausted its recovery attempts."""
+    if not target:
+        return []
+    open_ports = []
+    for port in _COMMON_PORTS:
+        try:
+            sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            sock.settimeout(2)
+            result = sock.connect_ex((target, port))
+            if result == 0:
+                open_ports.append(port)
+            sock.close()
+        except Exception:
+            continue
+    return open_ports
+
+
+_COMMON_DIRS = ["/admin", "/login", "/api", "/wp-admin", "/phpmyadmin", "/robots.txt"]
+
+
+def _basic_directory_check(target: str) -> List[str]:
+    """Bare HTTP HEAD probe of common paths — the fallback when a real
+    content-discovery tool (gobuster/feroxbuster/dirsearch/ffuf) has failed."""
+    if not target:
+        return []
+    found_dirs = []
+    for directory in _COMMON_DIRS:
+        try:
+            url = f"{target.rstrip('/')}{directory}"
+            response = requests.head(url, timeout=5, allow_redirects=True)
+            if response.status_code in (200, 301, 302, 403):
+                found_dirs.append(directory)
+        except Exception:
+            continue
+    return found_dirs
+
+
+_SECURITY_HEADERS = {
+    "X-Frame-Options": "Clickjacking protection missing",
+    "X-Content-Type-Options": "MIME type sniffing protection missing",
+    "X-XSS-Protection": "XSS protection missing",
+    "Strict-Transport-Security": "HTTPS enforcement missing",
+    "Content-Security-Policy": "Content Security Policy missing",
+}
+
+
+def _basic_security_check(target: str) -> List[Dict[str, Any]]:
+    """Single-request security-header check — the fallback when a real
+    vulnerability scanner (nuclei/jaeles/nikto) has failed."""
+    if not target:
+        return []
+    vulnerabilities = []
+    try:
+        response = requests.get(target, timeout=10)
+        headers = response.headers
+        for header, description in _SECURITY_HEADERS.items():
+            if header not in headers:
+                vulnerabilities.append({
+                    "type": "missing_security_header",
+                    "severity": "medium",
+                    "description": description,
+                    "header": header,
+                })
+    except Exception as exc:
+        vulnerabilities.append({
+            "type": "connection_error",
+            "severity": "info",
+            "description": f"Could not perform basic security check: {exc}",
+        })
+    return vulnerabilities
+
+
+_MANUAL_RECOMMENDATIONS_BASE: Dict[str, List[str]] = {
+    "network_discovery": [
+        "Manually test common ports using telnet or nc",
+        "Check for service banners manually",
+        "Use online port scanners as alternative",
+    ],
+    "web_discovery": [
+        "Manually browse common directories",
+        "Check robots.txt and sitemap.xml",
+        "Use browser developer tools for endpoint discovery",
+    ],
+    "vulnerability_scanning": [
+        "Manually test for common vulnerabilities",
+        "Check security headers using browser tools",
+        "Perform manual input validation testing",
+    ],
+    "subdomain_enumeration": [
+        "Use online subdomain discovery tools",
+        "Check certificate transparency logs",
+        "Perform manual DNS queries",
+    ],
+}
+
+_COMPONENT_RECOMMENDATIONS = {
+    "nmap_scan": "Consider using online port scanners",
+    "gobuster_dir": "Try manual directory browsing",
+    "nuclei_scan": "Perform manual vulnerability testing",
+}
+
+
+def _get_manual_recommendations(operation: str, failed_components: List[str]) -> List[str]:
+    recommendations = list(_MANUAL_RECOMMENDATIONS_BASE.get(operation, []))
+    for component in failed_components:
+        extra = _COMPONENT_RECOMMENDATIONS.get(component)
+        if extra:
+            recommendations.append(extra)
+    return recommendations
+
+
+def apply_graceful_degradation(tool_name: str, target: str, result: Dict[str, Any]) -> Dict[str, Any]:
+    """Fill the gap left by a fully-exhausted tool with a cheap, direct
+    substitute check, instead of returning nothing but the failure."""
+    operation = _determine_operation_type(tool_name)
+    degraded = dict(result)
+    degraded["degradation_info"] = {
+        "operation": operation,
+        "failed_components": [tool_name],
+        "partial_success": True,
+        "fallback_applied": True,
+    }
+
+    if operation == "network_discovery":
+        degraded["open_ports"] = _basic_port_check(target)
+    elif operation == "web_discovery":
+        degraded["directories"] = _basic_directory_check(target)
+    elif operation == "vulnerability_scanning":
+        degraded["vulnerabilities"] = _basic_security_check(target)
+
+    degraded["manual_recommendations"] = _get_manual_recommendations(operation, [tool_name])
+    return degraded
+
+
 def execute_with_recovery(spec: ToolSpec, kwargs: Dict[str, Any], max_attempts: int = 3) -> Dict[str, Any]:
     current_kwargs = dict(kwargs)
     history: List[Dict[str, Any]] = []
@@ -398,8 +564,13 @@ def execute_with_recovery(spec: ToolSpec, kwargs: Dict[str, Any], max_attempts: 
             )
             break
 
-        # ABORT_OPERATION, and GRACEFUL_DEGRADATION (stubbed as abort in this
-        # port — see spec non-goals): stop, fall through to the return below.
+        if strategy.action == RecoveryAction.GRACEFUL_DEGRADATION:
+            last_result = apply_graceful_degradation(
+                spec.name, current_kwargs.get("target", "unknown"), last_result
+            )
+            break
+
+        # ABORT_OPERATION: stop, fall through to the return below.
         break
 
     last_result["recovery_info"] = {

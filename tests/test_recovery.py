@@ -371,3 +371,155 @@ def test_execute_with_recovery_suggests_real_registered_alternative():
 
     assert result["success"] is False
     assert result["alternative_tool_suggested"] == "rustscan_scan"
+
+
+def test_determine_operation_type_known_and_unknown():
+    assert recovery_module._determine_operation_type("nmap_scan") == "network_discovery"
+    assert recovery_module._determine_operation_type("gobuster_dir") == "web_discovery"
+    assert recovery_module._determine_operation_type("nuclei_scan") == "vulnerability_scanning"
+    assert recovery_module._determine_operation_type("amass_enum") == "subdomain_enumeration"
+    assert recovery_module._determine_operation_type("totally_unknown_tool") == "unknown_operation"
+
+
+def test_basic_port_check_returns_ports_with_successful_connect(monkeypatch):
+    class FakeSocket:
+        def __init__(self, *a, **k):
+            pass
+
+        def settimeout(self, t):
+            pass
+
+        def connect_ex(self, addr):
+            return 0 if addr[1] in (22, 80) else 1
+
+        def close(self):
+            pass
+
+    monkeypatch.setattr(recovery_module.socket, "socket", lambda *a, **k: FakeSocket())
+    assert recovery_module._basic_port_check("10.0.0.5") == [22, 80]
+
+
+def test_basic_port_check_empty_target_returns_empty_list():
+    assert recovery_module._basic_port_check("") == []
+
+
+def test_basic_directory_check_returns_dirs_with_matching_status(monkeypatch):
+    class FakeResponse:
+        def __init__(self, status_code):
+            self.status_code = status_code
+
+    def fake_head(url, timeout=None, allow_redirects=None):
+        if url.endswith("/admin") or url.endswith("/robots.txt"):
+            return FakeResponse(200)
+        return FakeResponse(404)
+
+    monkeypatch.setattr(recovery_module.requests, "head", fake_head)
+    assert recovery_module._basic_directory_check("http://example.com") == ["/admin", "/robots.txt"]
+
+
+def test_basic_directory_check_empty_target_returns_empty_list():
+    assert recovery_module._basic_directory_check("") == []
+
+
+def test_basic_security_check_flags_missing_headers(monkeypatch):
+    class FakeResponse:
+        headers = {"Content-Security-Policy": "default-src 'self'"}
+
+    monkeypatch.setattr(recovery_module.requests, "get", lambda url, timeout=None: FakeResponse())
+    vulns = recovery_module._basic_security_check("http://example.com")
+    headers_flagged = {v["header"] for v in vulns}
+    assert headers_flagged == {
+        "X-Frame-Options",
+        "X-Content-Type-Options",
+        "X-XSS-Protection",
+        "Strict-Transport-Security",
+    }
+
+
+def test_basic_security_check_empty_target_returns_empty_list():
+    assert recovery_module._basic_security_check("") == []
+
+
+def test_basic_security_check_connection_error_reported(monkeypatch):
+    def raise_error(url, timeout=None):
+        raise Exception("refused")
+
+    monkeypatch.setattr(recovery_module.requests, "get", raise_error)
+    vulns = recovery_module._basic_security_check("http://example.com")
+    assert len(vulns) == 1
+    assert vulns[0]["type"] == "connection_error"
+
+
+def test_get_manual_recommendations_includes_base_and_component_specific():
+    recs = recovery_module._get_manual_recommendations("network_discovery", ["nmap_scan"])
+    assert "Manually test common ports using telnet or nc" in recs
+    assert "Consider using online port scanners" in recs
+
+
+def test_get_manual_recommendations_unknown_operation_returns_empty_base():
+    recs = recovery_module._get_manual_recommendations("unknown_operation", [])
+    assert recs == []
+
+
+def test_apply_graceful_degradation_network_discovery(monkeypatch):
+    monkeypatch.setattr(recovery_module, "_basic_port_check", lambda target: [80, 443])
+    result = recovery_module.apply_graceful_degradation(
+        "nmap_scan", "10.0.0.5", {"success": False, "error": "target not responding"}
+    )
+    assert result["success"] is False
+    assert result["open_ports"] == [80, 443]
+    assert result["degradation_info"]["operation"] == "network_discovery"
+    assert result["degradation_info"]["partial_success"] is True
+    assert result["degradation_info"]["fallback_applied"] is True
+    assert "manual_recommendations" in result
+
+
+def test_apply_graceful_degradation_web_discovery(monkeypatch):
+    monkeypatch.setattr(recovery_module, "_basic_directory_check", lambda target: ["/admin"])
+    result = recovery_module.apply_graceful_degradation(
+        "gobuster_dir", "http://x.com", {"success": False, "error": "connection refused"}
+    )
+    assert result["directories"] == ["/admin"]
+    assert result["degradation_info"]["operation"] == "web_discovery"
+
+
+def test_apply_graceful_degradation_vulnerability_scanning(monkeypatch):
+    monkeypatch.setattr(recovery_module, "_basic_security_check", lambda target: [{"type": "missing_security_header"}])
+    result = recovery_module.apply_graceful_degradation(
+        "nuclei_scan", "http://x.com", {"success": False, "error": "timeout"}
+    )
+    assert result["vulnerabilities"] == [{"type": "missing_security_header"}]
+    assert result["degradation_info"]["operation"] == "vulnerability_scanning"
+
+
+def test_apply_graceful_degradation_unknown_operation_adds_no_extra_field():
+    result = recovery_module.apply_graceful_degradation(
+        "totally_unknown_tool", "x", {"success": False, "error": "x"}
+    )
+    assert "open_ports" not in result
+    assert "directories" not in result
+    assert "vulnerabilities" not in result
+    assert result["degradation_info"]["operation"] == "unknown_operation"
+
+
+def test_apply_graceful_degradation_does_not_mutate_input_dict():
+    original = {"success": False, "error": "x"}
+    recovery_module.apply_graceful_degradation("totally_unknown_tool", "x", original)
+    assert "degradation_info" not in original
+
+
+def test_execute_with_recovery_applies_graceful_degradation_for_target_unreachable(monkeypatch):
+    monkeypatch.setattr(recovery_module, "_basic_port_check", lambda target: [22, 80])
+
+    def handler(target):
+        return {"success": False, "error": "target not responding"}
+
+    spec = _fake_spec("nmap_scan", handler)
+    result = execute_with_recovery(spec, {"target": "10.0.0.5"})
+
+    assert result["success"] is False
+    assert result["degradation_info"]["operation"] == "network_discovery"
+    assert result["degradation_info"]["fallback_applied"] is True
+    assert result["open_ports"] == [22, 80]
+    assert "manual_recommendations" in result
+    assert result["recovery_info"]["attempts_made"] == 1
