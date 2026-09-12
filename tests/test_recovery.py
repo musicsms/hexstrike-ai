@@ -62,3 +62,30 @@ def test_classify_error_exception_type_shortcuts():
     assert classify_error("", PermissionError()) == ErrorType.PERMISSION_DENIED
     assert classify_error("", ConnectionError()) == ErrorType.NETWORK_UNREACHABLE
     assert classify_error("", FileNotFoundError()) == ErrorType.TOOL_NOT_FOUND
+
+
+from hexstrike.core.recovery import RecoveryAction, RECOVERY_STRATEGIES, select_best_strategy
+
+
+def test_recovery_strategies_cover_every_error_type():
+    assert set(RECOVERY_STRATEGIES.keys()) == set(ErrorType)
+
+
+def test_select_best_strategy_timeout_progression():
+    strategies = RECOVERY_STRATEGIES[ErrorType.TIMEOUT]
+    assert select_best_strategy(strategies, 1).action == RecoveryAction.RETRY_WITH_REDUCED_SCOPE
+    assert select_best_strategy(strategies, 2).action == RecoveryAction.RETRY_WITH_REDUCED_SCOPE
+    assert select_best_strategy(strategies, 3).action == RecoveryAction.RETRY_WITH_BACKOFF
+
+
+def test_select_best_strategy_permission_denied_escalates_immediately():
+    strategies = RECOVERY_STRATEGIES[ErrorType.PERMISSION_DENIED]
+    assert select_best_strategy(strategies, 1).action == RecoveryAction.ESCALATE_TO_HUMAN
+
+
+def test_select_best_strategy_falls_back_to_escalation_when_all_exhausted():
+    strategies = RECOVERY_STRATEGIES[ErrorType.TIMEOUT]
+    # attempt_count 4 exceeds every strategy's max_attempts (3, 2, 1)
+    result = select_best_strategy(strategies, 4)
+    assert result.action == RecoveryAction.ESCALATE_TO_HUMAN
+    assert result.max_attempts == 1
