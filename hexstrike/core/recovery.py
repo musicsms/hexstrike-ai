@@ -319,3 +319,74 @@ def build_escalation(
         "urgency": urgency,
         "suggested_actions": _human_suggestions(tool_name, error_type),
     }
+
+
+def execute_with_recovery(spec: ToolSpec, kwargs: Dict[str, Any], max_attempts: int = 3) -> Dict[str, Any]:
+    current_kwargs = dict(kwargs)
+    history: List[Dict[str, Any]] = []
+    attempt = 0
+    last_result: Dict[str, Any] = {"success": False, "error": "recovery loop did not execute"}
+
+    while attempt < max_attempts:
+        attempt += 1
+        try:
+            result = spec.handler(**current_kwargs)
+        except Exception as exc:
+            result = {"success": False, "error": str(exc)}
+        last_result = result
+
+        if result.get("success"):
+            result["recovery_info"] = {
+                "attempts_made": attempt,
+                "recovery_applied": len(history) > 0,
+                "recovery_history": history,
+            }
+            return result
+
+        error_type = classify_error(result.get("error") or "")
+        strategy = select_best_strategy(RECOVERY_STRATEGIES[error_type], attempt)
+        history.append({
+            "attempt": attempt,
+            "error": result.get("error"),
+            "recovery_action": strategy.action.value,
+        })
+
+        if strategy.action == RecoveryAction.RETRY_WITH_BACKOFF:
+            delay = min(
+                strategy.parameters.get("initial_delay", 5) * (strategy.backoff_multiplier ** (attempt - 1)),
+                strategy.parameters.get("max_delay", 60),
+            )
+            time.sleep(delay)
+            continue
+
+        if strategy.action in (RecoveryAction.RETRY_WITH_REDUCED_SCOPE, RecoveryAction.ADJUST_PARAMETERS):
+            current_kwargs = adjust_params(spec, error_type, current_kwargs)
+            continue
+
+        if strategy.action == RecoveryAction.SWITCH_TO_ALTERNATIVE_TOOL:
+            alt = get_alternative_tool(spec.name, strategy.parameters)
+            if alt:
+                last_result["alternative_tool_suggested"] = alt
+            break
+
+        if strategy.action == RecoveryAction.ESCALATE_TO_HUMAN:
+            last_result["human_escalation"] = build_escalation(
+                spec.name,
+                current_kwargs.get("target", "unknown"),
+                error_type,
+                result.get("error"),
+                attempt,
+                strategy.parameters.get("urgency", "medium"),
+            )
+            break
+
+        # ABORT_OPERATION, and GRACEFUL_DEGRADATION (stubbed as abort in this
+        # port — see spec non-goals): stop, fall through to the return below.
+        break
+
+    last_result["recovery_info"] = {
+        "attempts_made": attempt,
+        "recovery_applied": True,
+        "recovery_history": history,
+    }
+    return last_result

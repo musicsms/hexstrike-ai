@@ -228,3 +228,79 @@ def test_build_escalation_default_suggestion_for_unmapped_error_type():
     escalation = build_escalation("nmap_scan", "x", ErrorType.PARSING_ERROR, "malformed", 1)
     assert escalation["urgency"] == "medium"  # default param
     assert escalation["suggested_actions"] == ["Review error details and logs"]
+
+
+from hexstrike.core.recovery import execute_with_recovery
+
+
+def test_execute_with_recovery_backoff_then_succeeds(monkeypatch):
+    sleeps = []
+    monkeypatch.setattr(recovery_module.time, "sleep", lambda seconds: sleeps.append(seconds))
+
+    calls = {"count": 0}
+
+    def handler(target):
+        calls["count"] += 1
+        if calls["count"] == 1:
+            return {"success": False, "error": "rate limit exceeded"}
+        return {"success": True, "output": "ok"}
+
+    spec = _fake_spec("some_tool", handler)
+    result = execute_with_recovery(spec, {"target": "x"})
+
+    assert result["success"] is True
+    assert calls["count"] == 2
+    assert result["recovery_info"]["attempts_made"] == 2
+    assert result["recovery_info"]["recovery_applied"] is True
+    assert len(result["recovery_info"]["recovery_history"]) == 1
+    assert result["recovery_info"]["recovery_history"][0]["recovery_action"] == "retry_with_backoff"
+    assert sleeps == [30]  # RATE_LIMITED initial_delay, attempt 1: 30 * 1.5**0
+
+
+def test_execute_with_recovery_adjusts_params_then_succeeds():
+    seen_timeouts = []
+
+    def handler(target, timeout=300):
+        seen_timeouts.append(timeout)
+        if len(seen_timeouts) == 1:
+            return {"success": False, "error": "operation timed out"}
+        return {"success": True, "output": "ok"}
+
+    spec = _fake_spec("some_tool", handler)
+    result = execute_with_recovery(spec, {"target": "x", "timeout": 300})
+
+    assert result["success"] is True
+    assert seen_timeouts == [300, 600]  # GENERIC_ADJUSTMENTS[TIMEOUT] doubles it
+    assert result["recovery_info"]["attempts_made"] == 2
+    assert result["recovery_info"]["recovery_history"][0]["recovery_action"] == "retry_with_reduced_scope"
+
+
+def test_execute_with_recovery_escalates_and_stops_after_one_attempt():
+    calls = {"count": 0}
+
+    def handler(target):
+        calls["count"] += 1
+        return {"success": False, "error": "permission denied"}
+
+    spec = _fake_spec("some_tool", handler)
+    result = execute_with_recovery(spec, {"target": "x"})
+
+    assert result["success"] is False
+    assert calls["count"] == 1
+    assert result["recovery_info"]["attempts_made"] == 1
+    assert result["human_escalation"]["tool"] == "some_tool"
+    assert result["human_escalation"]["target"] == "x"
+    assert result["human_escalation"]["error_type"] == "permission_denied"
+
+
+def test_execute_with_recovery_handles_raised_exception():
+    def handler(target):
+        raise FileNotFoundError("nmap: command not found")
+
+    spec = _fake_spec("some_tool", handler)
+    result = execute_with_recovery(spec, {"target": "x"})
+
+    # TOOL_NOT_FOUND's best strategy at attempt 1 is SWITCH_TO_ALTERNATIVE_TOOL;
+    # no alternative is registered for "some_tool" so it just stops.
+    assert result["success"] is False
+    assert result["recovery_info"]["attempts_made"] == 1
