@@ -199,3 +199,32 @@ def test_adjust_params_does_not_mutate_input_dict():
     original = {"target": "x", "threads": 99}
     adjust_params(spec, ErrorType.TIMEOUT, original)
     assert original["threads"] == 99
+
+
+from hexstrike.core.recovery import build_escalation
+
+
+def test_build_escalation_shape():
+    escalation = build_escalation("nmap_scan", "10.0.0.1", ErrorType.PERMISSION_DENIED, "permission denied", 2, "high")
+    assert escalation["tool"] == "nmap_scan"
+    assert escalation["target"] == "10.0.0.1"
+    assert escalation["error_type"] == "permission_denied"
+    assert escalation["error_message"] == "permission denied"
+    assert escalation["attempt_count"] == 2
+    assert escalation["urgency"] == "high"
+    assert escalation["suggested_actions"] == [
+        "Run the command with sudo privileges",
+        "Check file/directory permissions",
+        "Verify user is in required groups",
+    ]
+
+
+def test_build_escalation_tool_not_found_suggestion_names_the_tool():
+    escalation = build_escalation("katana_crawl", "x.com", ErrorType.TOOL_NOT_FOUND, "not found", 1, "low")
+    assert escalation["suggested_actions"][0] == "Install katana_crawl using package manager"
+
+
+def test_build_escalation_default_suggestion_for_unmapped_error_type():
+    escalation = build_escalation("nmap_scan", "x", ErrorType.PARSING_ERROR, "malformed", 1)
+    assert escalation["urgency"] == "medium"  # default param
+    assert escalation["suggested_actions"] == ["Review error details and logs"]

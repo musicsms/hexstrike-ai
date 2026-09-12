@@ -272,3 +272,50 @@ def adjust_params(spec: ToolSpec, error_type: ErrorType, kwargs: Dict[str, Any])
         if key in accepted:
             adjusted[key] = value(adjusted.get(key)) if callable(value) else value
     return adjusted
+
+
+def _human_suggestions(tool_name: str, error_type: ErrorType) -> List[str]:
+    if error_type == ErrorType.PERMISSION_DENIED:
+        return [
+            "Run the command with sudo privileges",
+            "Check file/directory permissions",
+            "Verify user is in required groups",
+        ]
+    if error_type == ErrorType.TOOL_NOT_FOUND:
+        return [
+            f"Install {tool_name} using package manager",
+            "Check if tool is in PATH",
+            "Verify tool installation",
+        ]
+    if error_type == ErrorType.NETWORK_UNREACHABLE:
+        return [
+            "Check network connectivity",
+            "Verify target is accessible",
+            "Check firewall rules",
+        ]
+    if error_type == ErrorType.RATE_LIMITED:
+        return [
+            "Wait before retrying",
+            "Use slower scan rates",
+            "Check API rate limits",
+        ]
+    return ["Review error details and logs"]
+
+
+def build_escalation(
+    tool_name: str,
+    target: str,
+    error_type: ErrorType,
+    error_message: str,
+    attempt_count: int,
+    urgency: str = "medium",
+) -> Dict[str, Any]:
+    return {
+        "tool": tool_name,
+        "target": target,
+        "error_type": error_type.value,
+        "error_message": error_message,
+        "attempt_count": attempt_count,
+        "urgency": urgency,
+        "suggested_actions": _human_suggestions(tool_name, error_type),
+    }
