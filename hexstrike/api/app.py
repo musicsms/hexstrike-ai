@@ -10,7 +10,8 @@ import hexstrike.tools  # Ensure all tools are imported and registered
 logger = logging.getLogger(__name__)
 
 def create_tool_view(spec: ToolSpec):
-    accepted_params = set(inspect.signature(spec.handler).parameters)
+    handler_signature = inspect.signature(spec.handler)
+    accepted_params = set(handler_signature.parameters)
 
     def tool_view():
         if request.method == "POST":
@@ -18,7 +19,10 @@ def create_tool_view(spec: ToolSpec):
         else:
             payload = request.args.to_dict()
 
-        use_recovery_raw = payload.pop("use_recovery", False)
+        # Matches the legacy monolith's default (every route that had
+        # use_recovery defaulted it True) — a caller who says nothing still
+        # gets the recovery engine.
+        use_recovery_raw = payload.pop("use_recovery", True)
         if isinstance(use_recovery_raw, str):
             use_recovery = use_recovery_raw.strip().lower() in ("1", "true", "yes", "on")
         else:
@@ -33,6 +37,11 @@ def create_tool_view(spec: ToolSpec):
             logger.warning("Ignoring unsupported params for %s: %s", spec.name, sorted(unknown))
 
         try:
+            # Validate arguments before the recovery engine ever runs, same
+            # as the legacy monolith's explicit "if not target: return 400"
+            # pre-checks — a genuinely malformed call should 400 immediately,
+            # not get classified as an UNKNOWN error and escalated/retried.
+            handler_signature.bind(**payload)
             if use_recovery:
                 result = execute_with_recovery(spec, payload)
             else:

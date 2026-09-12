@@ -71,6 +71,29 @@ def test_tool_execution_route_missing_required_argument_returns_400(client):
     assert data["command"] == "nmap_scan"
 
 def test_tool_execution_route_handler_exception_returns_500(client, monkeypatch):
+    """With recovery explicitly disabled, an unexpected exception from the
+    handler surfaces as a 500 — the "genuine bug" pathway, distinct from
+    execute_with_recovery's own catch of the same exception when recovery
+    is on (see the companion test below)."""
+    from hexstrike.core.process import default_process_manager
+    monkeypatch.setattr("hexstrike.tools.base.is_tool_available", lambda name: True)
+
+    def raise_runtime_error(cmd, **kwargs):
+        raise RuntimeError("boom")
+
+    monkeypatch.setattr(default_process_manager, "execute_command", raise_runtime_error)
+    res = client.post("/api/tools/nmap", json={"target": "127.0.0.1", "use_recovery": False})
+    assert res.status_code == 500
+    data = res.get_json()
+    assert data["success"] is False
+    assert data["error"] == "boom"
+    assert data["command"] == "nmap_scan"
+
+def test_tool_execution_route_use_recovery_default_converts_handler_exception_to_structured_failure(client, monkeypatch):
+    """With recovery on (the new default, matching the legacy monolith),
+    execute_with_recovery itself catches the same unexpected exception and
+    returns a 200 with recovery_info/human_escalation, instead of letting it
+    propagate to the outer 500 handler."""
     from hexstrike.core.process import default_process_manager
     monkeypatch.setattr("hexstrike.tools.base.is_tool_available", lambda name: True)
 
@@ -79,11 +102,12 @@ def test_tool_execution_route_handler_exception_returns_500(client, monkeypatch)
 
     monkeypatch.setattr(default_process_manager, "execute_command", raise_runtime_error)
     res = client.post("/api/tools/nmap", json={"target": "127.0.0.1"})
-    assert res.status_code == 500
+    assert res.status_code == 200
     data = res.get_json()
     assert data["success"] is False
     assert data["error"] == "boom"
-    assert data["command"] == "nmap_scan"
+    assert data["recovery_info"]["attempts_made"] == 1
+    assert "human_escalation" in data
 
 def test_tool_execution_route_use_recovery_retries_then_succeeds(client, monkeypatch):
     from hexstrike.core.process import default_process_manager
@@ -109,7 +133,10 @@ def test_tool_execution_route_use_recovery_retries_then_succeeds(client, monkeyp
     assert calls["count"] == 2
 
 
-def test_tool_execution_route_use_recovery_defaults_to_false(client, monkeypatch):
+def test_tool_execution_route_use_recovery_defaults_to_true(client, monkeypatch):
+    """Matches the legacy monolith's default (use_recovery defaulted True on
+    every route that had it) — a caller who never mentions use_recovery still
+    gets the recovery engine, just with nothing to recover from here."""
     from hexstrike.core.process import default_process_manager
     monkeypatch.setattr("hexstrike.tools.base.is_tool_available", lambda name: True)
 
@@ -122,6 +149,27 @@ def test_tool_execution_route_use_recovery_defaults_to_false(client, monkeypatch
     monkeypatch.setattr(default_process_manager, "execute_command", fake_execute)
 
     res = client.post("/api/tools/nmap", json={"target": "127.0.0.1"})
+    assert res.status_code == 200
+    data = res.get_json()
+    assert data["success"] is True
+    assert data["recovery_info"]["attempts_made"] == 1
+    assert data["recovery_info"]["recovery_applied"] is False
+    assert calls["count"] == 1
+
+
+def test_tool_execution_route_use_recovery_can_be_explicitly_disabled(client, monkeypatch):
+    from hexstrike.core.process import default_process_manager
+    monkeypatch.setattr("hexstrike.tools.base.is_tool_available", lambda name: True)
+
+    calls = {"count": 0}
+
+    def fake_execute(cmd, **kwargs):
+        calls["count"] += 1
+        return {"success": True, "command": " ".join(cmd), "output": "ok", "cached": False}
+
+    monkeypatch.setattr(default_process_manager, "execute_command", fake_execute)
+
+    res = client.post("/api/tools/nmap", json={"target": "127.0.0.1", "use_recovery": False})
     assert res.status_code == 200
     data = res.get_json()
     assert data["success"] is True
