@@ -521,10 +521,10 @@ Configure VS Code settings in `.vscode/settings.json`:
 - **VulnerabilityCorrelator** - Attack chain discovery
 - **TechnologyDetector** - Technology stack identification
 - **RateLimitDetector** - Rate limiting detection
-- **FailureRecoverySystem** - Error handling and recovery
+- **FailureRecoverySystem** - Error classification, retry-with-backoff, parameter adjustment, alternative-tool suggestion, and human escalation, driven by the opt-in `use_recovery` request field on every `/api/tools/<name>` call (on by default; pass `"use_recovery": false` to disable)
 - **PerformanceMonitor** - System optimization
 - **ParameterOptimizer** - Context-aware optimization
-- **GracefulDegradation** - Fault-tolerant operation
+- **GracefulDegradation** - When a tool exhausts every recovery attempt against an unreachable target, falls back to a raw port connect-scan, a directory HEAD probe, or a security-header check (depending on the failed tool's category) plus manual-testing recommendations, instead of returning nothing but the failure
 
 ### Advanced Features
 
