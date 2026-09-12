@@ -1,5 +1,6 @@
 import pytest
 from hexstrike.core.recovery import ErrorType, classify_error
+from hexstrike.core.registry import ToolSpec
 
 
 def test_classify_error_timeout():
@@ -127,3 +128,74 @@ def test_get_alternative_tool_context_filter_excludes_when_alternative_remains(m
 
 def test_tool_alternatives_nmap_scan_entry_uses_current_registry_names():
     assert "rustscan_scan" in recovery_module.TOOL_ALTERNATIVES["nmap_scan"]
+
+
+from hexstrike.core.recovery import adjust_params
+
+
+def _fake_spec(name, handler):
+    return ToolSpec(name=name, category="test", description="", endpoint="/x", handler=handler)
+
+
+def test_adjust_params_applies_tool_specific_override():
+    def handler(target, threads=10, additional_args=None):
+        return {"success": True}
+    spec = _fake_spec("gobuster_dir", handler)
+
+    result = adjust_params(spec, ErrorType.TIMEOUT, {"target": "x", "threads": 10})
+    assert result["threads"] == 10  # gobuster_dir's TIMEOUT override sets threads to 10
+
+
+def test_adjust_params_skips_keys_not_in_handler_signature():
+    def handler(target, additional_args=None):  # no "threads" param
+        return {"success": True}
+    spec = _fake_spec("gobuster_dir", handler)
+
+    result = adjust_params(spec, ErrorType.TIMEOUT, {"target": "x"})
+    assert "threads" not in result
+
+
+def test_adjust_params_extra_flags_appends_to_existing_additional_args():
+    def handler(target, additional_args=None):
+        return {"success": True}
+    spec = _fake_spec("nmap_scan", handler)
+
+    result = adjust_params(spec, ErrorType.TIMEOUT, {"target": "x", "additional_args": "-Pn"})
+    assert result["additional_args"] == "-Pn -T2"
+
+
+def test_adjust_params_extra_flags_sets_when_absent():
+    def handler(target, additional_args=None):
+        return {"success": True}
+    spec = _fake_spec("nmap_scan", handler)
+
+    result = adjust_params(spec, ErrorType.TIMEOUT, {"target": "x"})
+    assert result["additional_args"] == "-T2"
+
+
+def test_adjust_params_falls_back_to_generic_for_unlisted_tool():
+    def handler(target, threads=10, additional_args=None):
+        return {"success": True}
+    spec = _fake_spec("some_future_tool", handler)
+
+    result = adjust_params(spec, ErrorType.RATE_LIMITED, {"target": "x", "threads": 10})
+    assert result["threads"] == 3  # GENERIC_ADJUSTMENTS[RATE_LIMITED]
+
+
+def test_adjust_params_generic_timeout_doubles_current_value():
+    def handler(target, timeout=300, additional_args=None):
+        return {"success": True}
+    spec = _fake_spec("some_future_tool", handler)
+
+    result = adjust_params(spec, ErrorType.TIMEOUT, {"target": "x", "timeout": 100})
+    assert result["timeout"] == 200
+
+
+def test_adjust_params_does_not_mutate_input_dict():
+    def handler(target, threads=10, additional_args=None):
+        return {"success": True}
+    spec = _fake_spec("gobuster_dir", handler)
+
+    original = {"target": "x", "threads": 99}
+    adjust_params(spec, ErrorType.TIMEOUT, original)
+    assert original["threads"] == 99

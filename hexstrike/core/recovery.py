@@ -223,3 +223,52 @@ def get_alternative_tool(tool_name: str, strategy_params: Dict[str, Any]) -> Opt
     if not filtered:
         filtered = candidates
     return filtered[0]
+
+
+TOOL_PARAM_ADJUSTMENTS: Dict[str, Dict[ErrorType, Dict[str, Any]]] = {
+    "nmap_scan": {
+        ErrorType.TIMEOUT: {"extra_flags": "-T2"},
+        ErrorType.RATE_LIMITED: {"extra_flags": "-T1"},
+    },
+    "gobuster_dir": {
+        ErrorType.TIMEOUT: {"threads": 10},
+        ErrorType.RATE_LIMITED: {"threads": 5},
+        ErrorType.RESOURCE_EXHAUSTED: {"threads": 5},
+    },
+    "nuclei_scan": {
+        ErrorType.TIMEOUT: {"extra_flags": "-timeout 30"},
+        ErrorType.RATE_LIMITED: {"extra_flags": "-rl 10"},
+    },
+    "feroxbuster_scan": {
+        ErrorType.TIMEOUT: {"threads": 5},
+        ErrorType.RATE_LIMITED: {"threads": 3},
+    },
+    "ffuf_fuzz": {
+        ErrorType.RATE_LIMITED: {"extra_flags": "-rate 10"},
+    },
+}
+
+GENERIC_ADJUSTMENTS: Dict[ErrorType, Dict[str, Any]] = {
+    ErrorType.TIMEOUT: {"timeout": lambda current: (current or 300) * 2},
+    ErrorType.RATE_LIMITED: {"threads": 3},
+    ErrorType.RESOURCE_EXHAUSTED: {"threads": 3},
+}
+
+
+def adjust_params(spec: ToolSpec, error_type: ErrorType, kwargs: Dict[str, Any]) -> Dict[str, Any]:
+    accepted = set(inspect.signature(spec.handler).parameters)
+    adjustments = TOOL_PARAM_ADJUSTMENTS.get(spec.name, {}).get(error_type)
+    if adjustments is None:
+        adjustments = GENERIC_ADJUSTMENTS.get(error_type, {})
+
+    adjusted = dict(kwargs)
+    for key, value in adjustments.items():
+        if key == "extra_flags":
+            if "additional_args" not in accepted:
+                continue
+            existing = adjusted.get("additional_args") or ""
+            adjusted["additional_args"] = f"{existing} {value}".strip()
+            continue
+        if key in accepted:
+            adjusted[key] = value(adjusted.get(key)) if callable(value) else value
+    return adjusted
