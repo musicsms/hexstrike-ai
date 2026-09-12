@@ -89,3 +89,41 @@ def test_select_best_strategy_falls_back_to_escalation_when_all_exhausted():
     result = select_best_strategy(strategies, 4)
     assert result.action == RecoveryAction.ESCALATE_TO_HUMAN
     assert result.max_attempts == 1
+
+
+import hexstrike.core.recovery as recovery_module
+from hexstrike.core.recovery import get_alternative_tool
+
+
+def test_get_alternative_tool_returns_none_when_no_alternatives_listed(monkeypatch):
+    monkeypatch.setattr(recovery_module, "TOOL_ALTERNATIVES", {})
+    assert get_alternative_tool("totally_unknown_tool", {}) is None
+
+
+def test_get_alternative_tool_filters_to_registered_tools_only(monkeypatch):
+    monkeypatch.setattr(recovery_module, "TOOL_ALTERNATIVES", {"tool_a": ["tool_b", "tool_c", "tool_d"]})
+    monkeypatch.setattr(
+        recovery_module.ToolRegistry, "get",
+        staticmethod(lambda name: object() if name in ("tool_c", "tool_d") else None),
+    )
+    # tool_b isn't "registered" per the stub above, so it's skipped entirely
+    assert get_alternative_tool("tool_a", {}) == "tool_c"
+
+
+def test_get_alternative_tool_context_filter_falls_back_when_all_excluded(monkeypatch):
+    monkeypatch.setattr(recovery_module, "TOOL_ALTERNATIVES", {"tool_a": ["nmap_scan", "masscan_scan"]})
+    monkeypatch.setattr(recovery_module.ToolRegistry, "get", staticmethod(lambda name: object()))
+    # Both candidates are in the require_no_privileges denylist, so the filter
+    # excludes everything and (matching legacy behavior) falls back to the
+    # unfiltered candidate list rather than returning None.
+    assert get_alternative_tool("tool_a", {"require_no_privileges": True}) == "nmap_scan"
+
+
+def test_get_alternative_tool_context_filter_excludes_when_alternative_remains(monkeypatch):
+    monkeypatch.setattr(recovery_module, "TOOL_ALTERNATIVES", {"tool_a": ["nmap_scan", "rustscan_scan"]})
+    monkeypatch.setattr(recovery_module.ToolRegistry, "get", staticmethod(lambda name: object()))
+    assert get_alternative_tool("tool_a", {"require_no_privileges": True}) == "rustscan_scan"
+
+
+def test_tool_alternatives_nmap_scan_entry_uses_current_registry_names():
+    assert "rustscan_scan" in recovery_module.TOOL_ALTERNATIVES["nmap_scan"]

@@ -161,3 +161,65 @@ def select_best_strategy(strategies: List[RecoveryStrategy], attempt_count: int)
         scored.append((score, strategy))
     scored.sort(key=lambda pair: pair[0], reverse=True)
     return scored[0][1]
+
+
+TOOL_ALTERNATIVES: Dict[str, List[str]] = {
+    "nmap_scan": ["rustscan_scan", "masscan_scan", "zmap"],
+    "rustscan_scan": ["nmap_scan", "masscan_scan"],
+    "masscan_scan": ["nmap_scan", "rustscan_scan", "zmap"],
+
+    "gobuster_dir": ["feroxbuster_scan", "dirsearch_scan", "ffuf_fuzz", "dirb_scan"],
+    "feroxbuster_scan": ["gobuster_dir", "dirsearch_scan", "ffuf_fuzz"],
+    "dirsearch_scan": ["gobuster_dir", "feroxbuster_scan", "ffuf_fuzz"],
+    "ffuf_fuzz": ["gobuster_dir", "feroxbuster_scan", "dirsearch_scan"],
+
+    "nuclei_scan": ["jaeles_scan", "nikto_scan", "w3af"],
+    "jaeles_scan": ["nuclei_scan", "nikto_scan"],
+    "nikto_scan": ["nuclei_scan", "jaeles_scan", "w3af"],
+
+    "katana_crawl": ["gau_discover", "waybackurls_discover", "hakrawler_crawl"],
+    "gau_discover": ["katana_crawl", "waybackurls_discover", "hakrawler_crawl"],
+    "waybackurls_discover": ["gau_discover", "katana_crawl", "hakrawler_crawl"],
+
+    "arjun_scan": ["paramspider_mine", "x8_scan", "ffuf_fuzz"],
+    "paramspider_mine": ["arjun_scan", "x8_scan"],
+    "x8_scan": ["arjun_scan", "paramspider_mine"],
+
+    "sqlmap_scan": ["sqlninja", "jsql-injection"],
+    "dalfox_scan": ["xsser_scan", "xsstrike"],
+
+    "subfinder": ["amass_enum", "assetfinder", "findomain"],
+    "amass_enum": ["subfinder", "assetfinder", "findomain"],
+    "assetfinder": ["subfinder", "amass_enum", "findomain"],
+
+    "prowler_scan": ["scout_suite_scan", "cloudmapper_run"],
+    "scout_suite_scan": ["prowler_scan", "cloudmapper_run"],
+
+    "trivy_scan": ["clair_scan", "docker_bench_security_scan"],
+    "clair_scan": ["trivy_scan", "docker_bench_security_scan"],
+
+    "ghidra_analyze": ["radare2_analyze", "ida", "binary-ninja"],
+    "radare2_analyze": ["ghidra_analyze", "objdump_scan", "gdb_analyze"],
+    "gdb_analyze": ["radare2_analyze", "lldb"],
+
+    "pwntools_exploit": ["ropper_scan", "ropgadget"],
+    "ropper_scan": ["ropgadget", "pwntools_exploit"],
+}
+
+
+def get_alternative_tool(tool_name: str, strategy_params: Dict[str, Any]) -> Optional[str]:
+    candidates = [t for t in TOOL_ALTERNATIVES.get(tool_name, []) if ToolRegistry.get(t) is not None]
+    if not candidates:
+        return None
+
+    filtered = []
+    for alt in candidates:
+        if strategy_params.get("require_no_privileges") and alt in ("nmap_scan", "masscan_scan"):
+            continue
+        if strategy_params.get("prefer_faster_tools") and alt in ("amass_enum", "w3af"):
+            continue
+        filtered.append(alt)
+
+    if not filtered:
+        filtered = candidates
+    return filtered[0]
